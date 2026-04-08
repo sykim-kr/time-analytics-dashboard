@@ -22,11 +22,12 @@ Mixpanel 데이터를 기반으로 시간 기반 분석 프레임워크의 6개 
 ### 기술 스택
 - Next.js App Router + TypeScript
 - Tailwind CSS
-- Recharts
+- Recharts (히트맵은 CSS grid 기반 커스텀 컴포넌트로 구현)
+- TanStack Query (클라이언트 데이터 페칭, 캐싱, 재시도)
 - zod (입력 검증)
 
 ### UI 언어
-한국어
+한국어 (분석 용어는 영어 원문 유지 — Calendar Time, Time-to-X 등 도메인 친숙성을 위해)
 
 ---
 
@@ -49,14 +50,18 @@ Mixpanel 데이터를 기반으로 시간 기반 분석 프레임워크의 6개 
 ```
 사용자 클릭 "Mixpanel 인증하기"
   → 프론트엔드: /api/mixpanel/auth 호출
-  → 서버: Mixpanel OAuth authorize URL 생성 → 리다이렉트
+  → 서버: random state 생성 → httpOnly 쿠키에 저장
+  → 서버: Mixpanel OAuth authorize URL 생성 (state 포함) → 리다이렉트
   → 사용자: Mixpanel 로그인 & 권한 승인
-  → Mixpanel: callback URL로 code 전달
-  → 서버: /api/mixpanel/callback에서 code → access_token 교환
-  → 서버: token을 httpOnly 쿠키에 저장
+  → Mixpanel: callback URL로 code + state 전달
+  → 서버: /api/mixpanel/callback에서 state 검증 (CSRF 방지)
+  → 서버: code → access_token 교환
+  → 서버: token을 httpOnly 쿠키에 저장, state 쿠키 삭제
   → 프론트엔드로 리다이렉트 (인증 완료 상태)
   → 자동으로 /api/mixpanel/projects 호출 → 프로젝트 리스트 표시
 ```
+
+> **참고:** 워크플로우 문서에서는 서비스 계정 방식을 기술하고 있으나, 사용자 요구에 따라 OAuth를 채택한다. 서비스 계정 방식은 Phase 2에서 fallback 옵션으로 고려할 수 있다.
 
 ### 상태 모델
 
@@ -64,21 +69,25 @@ Mixpanel 데이터를 기반으로 시간 기반 분석 프레임워크의 6개 
 |------|---------|--------|
 | `idle` | "Mixpanel 인증하기" 버튼 | 초기 상태 |
 | `authenticating` | 버튼 로딩 스피너 | 버튼 클릭 |
-| `authenticated` | ✓ 연결됨 배지 + 프로젝트 드롭다운 | OAuth 콜백 성공 |
-| `project_selected` | 프로젝트명 표시 + 첫 탭 데이터 로딩 | 프로젝트 선택 |
+| `authenticated` | ✓ 연결됨 배지 | OAuth 콜백 성공 |
+| `loading_projects` | 프로젝트 드롭다운 로딩 스피너 | 인증 성공 직후 |
+| `project_selected` | 프로젝트명 표시 | 프로젝트 선택 |
+| `loading_analysis` | 탭 콘텐츠 스켈레톤 | 탭 데이터 로딩 중 |
 | `ready` | 탭 데이터 렌더링 | 분석 데이터 로드 완료 |
 | `error` | 에러 메시지 + 재시도 버튼 | API 실패 |
 
 ### 토큰 관리
 - access_token은 httpOnly 쿠키에 저장 (브라우저 JS 접근 불가)
 - 서버 API route에서만 토큰을 읽어 Mixpanel API 호출
-- 토큰 만료 시 refresh 또는 재인증 유도
+- Mixpanel OAuth는 refresh token을 제공하지 않음
+- 토큰 만료(또는 서버에서 401 응답) 시: 프론트엔드에 `auth_expired` 상태 반환 → 재인증 유도
+- 모든 API route에서 401 감지 시 `{ error: "auth_expired" }` 반환, 프론트엔드에서 인증 버튼으로 복귀
 - 로그아웃 시 쿠키 삭제
 
 ### 클라이언트 상태 관리
 - React Context (`MixpanelAuthContext`)로 인증 상태 관리
-- `useState` + `useEffect`로 구현 (별도 상태 라이브러리 불필요)
-- 탭별 데이터는 각 탭 컴포넌트에서 `fetch`로 독립 관리
+- TanStack Query로 데이터 페칭, 캐싱, 재시도, 로딩 상태 관리
+- 탭별 데이터는 각 탭 컴포넌트에서 `useQuery`로 독립 관리
 
 ---
 
@@ -114,6 +123,22 @@ Mixpanel 데이터를 기반으로 시간 기반 분석 프레임워크의 6개 
 ### 공통 API 응답 구조
 
 ```ts
+// 차트 데이터 타입 (차트 종류별 discriminated union)
+type LineChartData = { x: string; [series: string]: number | string }[];
+type BarChartData = { label: string; value: number; group?: string }[];
+type HeatmapChartData = { x: string; y: string; value: number }[];
+type TableChartData = { columns: string[]; rows: (string | number)[][] };
+type AreaChartData = { x: string; [series: string]: number | string }[];
+type ScatterChartData = { x: number; y: number; label?: string }[];
+
+type ChartConfig =
+  | { id: string; type: "line"; title: string; data: LineChartData }
+  | { id: string; type: "bar"; title: string; data: BarChartData }
+  | { id: string; type: "heatmap"; title: string; data: HeatmapChartData }
+  | { id: string; type: "table"; title: string; data: TableChartData }
+  | { id: string; type: "area"; title: string; data: AreaChartData }
+  | { id: string; type: "scatter"; title: string; data: ScatterChartData };
+
 type AnalysisResponse = {
   projectId: number;
   analysisType: "calendar" | "timetox" | "retention" | "velocity" | "lifecycle" | "context";
@@ -121,15 +146,19 @@ type AnalysisResponse = {
   requiredEvents?: string[];
   requiredProperties?: string[];
   metrics: Array<{ label: string; value: string | number; change?: string }>;
-  charts: Array<{
-    id: string;
-    type: "line" | "bar" | "heatmap" | "table" | "area" | "scatter";
-    title: string;
-    data: any[];
-  }>;
+  charts: ChartConfig[];
   insights: string[];
   warnings?: string[];
 }
+
+// API 에러 응답 (HTTP 4xx/5xx)
+type ApiErrorResponse = {
+  error: string;
+  code: "auth_expired" | "invalid_params" | "upstream_error" | "rate_limited" | "not_found";
+  details?: string;
+}
+// HTTP 상태 코드: 401(인증 만료), 400(잘못된 파라미터), 502(Mixpanel 오류), 429(요청 제한)
+// 200 + status: "error"는 데이터 레벨 이슈 (이벤트 없음 등)
 ```
 
 ### 5.1 Calendar Time (📅 캘린더 시간)
@@ -352,15 +381,35 @@ page.tsx
 ### 스키마
 - `GET /api/mixpanel/schema?projectId=12345` — 프로젝트의 이벤트/속성 목록
 
-### 분석 (6개)
-- `GET /api/mixpanel/analysis/calendar?projectId=12345`
-- `GET /api/mixpanel/analysis/timetox?projectId=12345`
-- `GET /api/mixpanel/analysis/retention?projectId=12345`
-- `GET /api/mixpanel/analysis/velocity?projectId=12345`
-- `GET /api/mixpanel/analysis/lifecycle?projectId=12345`
-- `GET /api/mixpanel/analysis/context?projectId=12345`
+스키마 응답 타입:
+```ts
+type SchemaResponse = {
+  events: Array<{
+    name: string;
+    properties: Array<{ name: string; type: string }>;
+  }>;
+  userProperties: Array<{ name: string; type: string }>;
+}
+```
 
-모든 분석 API는 `AnalysisResponse` 구조를 반환한다.
+### 분석 (6개)
+
+공통 쿼리 파라미터:
+- `projectId` (필수): Mixpanel 프로젝트 ID
+- `period` (선택): `7d` | `30d` | `90d` — 기본값 `30d`
+- `from` / `to` (선택): ISO 날짜 문자열 — `period` 대신 사용 가능
+
+```
+GET /api/mixpanel/analysis/calendar?projectId=12345&period=30d
+GET /api/mixpanel/analysis/timetox?projectId=12345&period=30d
+GET /api/mixpanel/analysis/retention?projectId=12345&period=90d
+GET /api/mixpanel/analysis/velocity?projectId=12345&period=30d
+GET /api/mixpanel/analysis/lifecycle?projectId=12345&period=30d
+GET /api/mixpanel/analysis/context?projectId=12345&from=2026-03-01&to=2026-03-31
+```
+
+성공 시 `AnalysisResponse` (HTTP 200) 반환.
+에러 시 `ApiErrorResponse` (HTTP 4xx/5xx) 반환.
 
 ---
 
@@ -392,6 +441,18 @@ page.tsx
 - 환경변수(OAuth client_id/secret)는 `.env.local`에만 보관
 - 요청 파라미터는 zod로 검증
 - 시크릿 로깅 금지
+- OAuth callback에서 `state` 파라미터로 CSRF 방지 (인증 플로우 참조)
+- 쿠키 설정: `httpOnly`, `secure` (production), `sameSite: lax`
+
+### 환경변수 (.env.example)
+
+```
+MIXPANEL_CLIENT_ID=           # Mixpanel OAuth 앱 client ID
+MIXPANEL_CLIENT_SECRET=       # Mixpanel OAuth 앱 client secret
+MIXPANEL_REDIRECT_URI=http://localhost:3000/api/mixpanel/callback
+COOKIE_SECRET=                # 쿠키 서명 시크릿 (32자 이상 랜덤 문자열)
+USE_MOCK=true                 # true: mock 데이터 사용, false: 실제 API
+```
 
 ---
 
