@@ -1,9 +1,13 @@
 "use client";
 
+import ChartHeader from "./ChartHeader";
+import type { ChartQueryInfo } from "@/lib/types";
+
 type Props = {
   data: { columns: string[]; rows: (string | number)[][] };
   title: string;
   eventLabel?: string;
+  queryInfo?: ChartQueryInfo;
 };
 
 function getCellBg(value: number): string {
@@ -13,14 +17,10 @@ function getCellBg(value: number): string {
   return "transparent";
 }
 
-export default function CohortTable({ data, title, eventLabel }: Props) {
+export default function CohortTable({ data, title, eventLabel, queryInfo }: Props) {
   return (
     <div className="bg-slate-800 rounded-xl p-5 border border-slate-700 overflow-x-auto">
-      <p className="text-sm font-semibold text-slate-100">{title}</p>
-      {eventLabel && (
-        <p className="text-xs text-purple-400 mb-3">{eventLabel}</p>
-      )}
-      {!eventLabel && <div className="mb-3" />}
+      <ChartHeader title={title} eventLabel={eventLabel} queryInfo={queryInfo} />
 
       <table className="w-full text-sm">
         <thead>

@@ -11,7 +11,7 @@ import NLQueryPanel from "@/components/nlquery/NLQueryPanel";
 import ComparisonBarChart from "@/components/charts/ComparisonBarChart";
 import TimeSeriesChart from "@/components/charts/TimeSeriesChart";
 import { API_URL } from "@/lib/api";
-import type { EventSlot, AnalysisResponse } from "@/lib/types";
+import type { EventSlot, AnalysisResponse, ChartQueryInfo } from "@/lib/types";
 
 const EVENT_SLOTS: EventSlot[] = [
   {
@@ -55,6 +55,14 @@ export function LifecycleTab() {
 
   const status = isLoading ? "loading" : error ? "error" : data?.status || "loading";
 
+  const makeQueryInfo = (chartEvents: { label: string; key: string }[], breakdown?: string): ChartQueryInfo => ({
+    events: chartEvents
+      .filter(e => eventSelections[e.key])
+      .map(e => ({ label: e.label, value: eventSelections[e.key] })),
+    period: "30일",
+    breakdown,
+  });
+
   const lifecycleDistChart = data?.charts.find((c) => c.id === "lifecycleDistribution");
   const churnTrendChart = data?.charts.find((c) => c.id === "churnTrend");
   const reactivationChart = data?.charts.find((c) => c.id === "reactivation");
@@ -74,6 +82,7 @@ export function LifecycleTab() {
             <ComparisonBarChart
               data={lifecycleDistChart.data}
               title={lifecycleDistChart.title}
+              queryInfo={makeQueryInfo([{label:"활성 측정",key:"active"}], "Lifecycle State")}
             />
           )}
           {churnTrendChart && (
@@ -81,6 +90,7 @@ export function LifecycleTab() {
               data={churnTrendChart.data as { x: string; [series: string]: number | string }[]}
               chartType="line"
               title={churnTrendChart.title}
+              queryInfo={makeQueryInfo([{label:"활성 측정",key:"active"}], "Weekly Churn")}
             />
           )}
           {reactivationChart && (
@@ -88,6 +98,7 @@ export function LifecycleTab() {
               data={reactivationChart.data as { x: string; [series: string]: number | string }[]}
               chartType="line"
               title={reactivationChart.title}
+              queryInfo={makeQueryInfo([{label:"활성 측정",key:"active"}], "Weekly Reactivation")}
             />
           )}
         </div>

@@ -11,7 +11,7 @@ import NLQueryPanel from "@/components/nlquery/NLQueryPanel";
 import ComparisonBarChart from "@/components/charts/ComparisonBarChart";
 import TimeSeriesChart from "@/components/charts/TimeSeriesChart";
 import { API_URL } from "@/lib/api";
-import type { EventSlot, AnalysisResponse } from "@/lib/types";
+import type { EventSlot, AnalysisResponse, ChartQueryInfo } from "@/lib/types";
 
 const EVENT_SLOTS: EventSlot[] = [
   {
@@ -61,6 +61,14 @@ export function VelocityTab() {
 
   const status = isLoading ? "loading" : error ? "error" : data?.status || "loading";
 
+  const makeQueryInfo = (chartEvents: { label: string; key: string }[], breakdown?: string): ChartQueryInfo => ({
+    events: chartEvents
+      .filter(e => eventSelections[e.key])
+      .map(e => ({ label: e.label, value: eventSelections[e.key] })),
+    period: "30일",
+    breakdown,
+  });
+
   const frequencyChart = data?.charts.find((c) => c.id === "frequency");
   const sessionIntervalChart = data?.charts.find((c) => c.id === "sessionInterval");
   const fastSlowPurchaseChart = data?.charts.find((c) => c.id === "fastSlowPurchase");
@@ -80,6 +88,7 @@ export function VelocityTab() {
             <ComparisonBarChart
               data={frequencyChart.data}
               title={frequencyChart.title}
+              queryInfo={makeQueryInfo([{label:"빈도 측정",key:"frequency"}], "Event Count Bucket")}
             />
           )}
           {sessionIntervalChart && (
@@ -87,12 +96,14 @@ export function VelocityTab() {
               data={sessionIntervalChart.data as { x: string; [series: string]: number | string }[]}
               chartType="line"
               title={sessionIntervalChart.title}
+              queryInfo={makeQueryInfo([{label:"세션",key:"session"}], "Daily Avg Interval")}
             />
           )}
           {fastSlowPurchaseChart && fastSlowPurchaseChart.type === "bar" && (
             <ComparisonBarChart
               data={fastSlowPurchaseChart.data}
               title={fastSlowPurchaseChart.title}
+              queryInfo={makeQueryInfo([{label:"빈도 측정",key:"frequency"},{label:"전환",key:"conversion"}], "Fast/Slow")}
             />
           )}
         </div>

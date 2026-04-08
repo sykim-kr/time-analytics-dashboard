@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import ChartHeader from "./ChartHeader";
+import type { ChartQueryInfo } from "@/lib/types";
 
 type Props = {
   data: { x: string; y: string; value: number }[];
@@ -8,6 +10,7 @@ type Props = {
   xLabels: string[];
   yLabels: string[];
   eventLabel?: string;
+  queryInfo?: ChartQueryInfo;
 };
 
 function getColor(value: number, min: number, max: number): string {
@@ -26,6 +29,7 @@ export default function HeatmapChart({
   xLabels,
   yLabels,
   eventLabel,
+  queryInfo,
 }: Props) {
   const values = data.map((d) => d.value);
   const min = Math.min(...values);
@@ -39,11 +43,7 @@ export default function HeatmapChart({
 
   return (
     <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
-      <p className="text-sm font-semibold text-slate-100">{title}</p>
-      {eventLabel && (
-        <p className="text-xs text-purple-400 mb-3">{eventLabel}</p>
-      )}
-      {!eventLabel && <div className="mb-3" />}
+      <ChartHeader title={title} eventLabel={eventLabel} queryInfo={queryInfo} />
 
       <div
         className="gap-1"

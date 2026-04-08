@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
+import ChartHeader from "./ChartHeader";
+import type { ChartQueryInfo } from "@/lib/types";
 import {
   ResponsiveContainer,
   BarChart,
@@ -16,6 +18,7 @@ type Props = {
   data: { label: string; value: number; group?: string }[];
   title: string;
   eventLabel?: string;
+  queryInfo?: ChartQueryInfo;
 };
 
 const GROUP_COLORS = ["#a855f7", "#6366f1", "#8b5cf6"];
@@ -24,6 +27,7 @@ export default function ComparisonBarChart({
   data,
   title,
   eventLabel,
+  queryInfo,
 }: Props) {
   const hasGroups = data.some((d) => d.group !== undefined);
 
@@ -52,11 +56,7 @@ export default function ComparisonBarChart({
 
   return (
     <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
-      <p className="text-sm font-semibold text-slate-100">{title}</p>
-      {eventLabel && (
-        <p className="text-xs text-purple-400 mb-3">{eventLabel}</p>
-      )}
-      {!eventLabel && <div className="mb-3" />}
+      <ChartHeader title={title} eventLabel={eventLabel} queryInfo={queryInfo} />
 
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={chartData as Record<string, unknown>[]}>

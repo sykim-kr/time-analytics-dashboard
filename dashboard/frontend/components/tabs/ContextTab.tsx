@@ -11,7 +11,7 @@ import NLQueryPanel from "@/components/nlquery/NLQueryPanel";
 import TimeSeriesChart from "@/components/charts/TimeSeriesChart";
 import ComparisonBarChart from "@/components/charts/ComparisonBarChart";
 import { API_URL } from "@/lib/api";
-import type { EventSlot, AnalysisResponse } from "@/lib/types";
+import type { EventSlot, AnalysisResponse, ChartQueryInfo } from "@/lib/types";
 
 const EVENT_SLOTS: EventSlot[] = [
   {
@@ -55,6 +55,14 @@ export function ContextTab() {
 
   const status = isLoading ? "loading" : error ? "error" : data?.status || "loading";
 
+  const makeQueryInfo = (chartEvents: { label: string; key: string }[], breakdown?: string): ChartQueryInfo => ({
+    events: chartEvents
+      .filter(e => eventSelections[e.key])
+      .map(e => ({ label: e.label, value: eventSelections[e.key] })),
+    period: "30일",
+    breakdown,
+  });
+
   const campaignEffectChart = data?.charts.find((c) => c.id === "campaignEffect");
   const paydayEffectChart = data?.charts.find((c) => c.id === "paydayEffect");
   const holidayComparisonChart = data?.charts.find((c) => c.id === "holidayComparison");
@@ -75,18 +83,21 @@ export function ContextTab() {
               data={campaignEffectChart.data as { x: string; [series: string]: number | string }[]}
               chartType="line"
               title={campaignEffectChart.title}
+              queryInfo={makeQueryInfo([{label:"분석 대상",key:"target"}], "Campaign/Non-campaign")}
             />
           )}
           {paydayEffectChart && paydayEffectChart.type === "bar" && (
             <ComparisonBarChart
               data={paydayEffectChart.data}
               title={paydayEffectChart.title}
+              queryInfo={makeQueryInfo([{label:"분석 대상",key:"target"}], "Payday Phase")}
             />
           )}
           {holidayComparisonChart && holidayComparisonChart.type === "bar" && (
             <ComparisonBarChart
               data={holidayComparisonChart.data}
               title={holidayComparisonChart.title}
+              queryInfo={makeQueryInfo([{label:"분석 대상",key:"target"}], "Weekday/Weekend")}
             />
           )}
         </div>

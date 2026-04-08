@@ -11,7 +11,7 @@ import NLQueryPanel from "@/components/nlquery/NLQueryPanel";
 import RetentionCurveChart from "@/components/charts/RetentionCurveChart";
 import CohortTable from "@/components/charts/CohortTable";
 import { API_URL } from "@/lib/api";
-import type { EventSlot, AnalysisResponse } from "@/lib/types";
+import type { EventSlot, AnalysisResponse, ChartQueryInfo } from "@/lib/types";
 
 const EVENT_SLOTS: EventSlot[] = [
   {
@@ -55,6 +55,14 @@ export function RetentionTab() {
 
   const status = isLoading ? "loading" : error ? "error" : data?.status || "loading";
 
+  const makeQueryInfo = (chartEvents: { label: string; key: string }[], breakdown?: string): ChartQueryInfo => ({
+    events: chartEvents
+      .filter(e => eventSelections[e.key])
+      .map(e => ({ label: e.label, value: eventSelections[e.key] })),
+    period: "30일",
+    breakdown,
+  });
+
   const retentionCurve = data?.charts.find((c) => c.id === "retentionCurve");
   const cohortTable = data?.charts.find((c) => c.id === "cohortTable");
   const channelRetention = data?.charts.find((c) => c.id === "channelRetention");
@@ -74,18 +82,21 @@ export function RetentionTab() {
             <RetentionCurveChart
               data={retentionCurve.data}
               title={retentionCurve.title}
+              queryInfo={makeQueryInfo([{label:"코호트",key:"cohort"},{label:"리턴",key:"returnEvent"}], "Day (D0-D30)")}
             />
           )}
           {cohortTable && cohortTable.type === "table" && (
             <CohortTable
               data={cohortTable.data}
               title={cohortTable.title}
+              queryInfo={makeQueryInfo([{label:"코호트",key:"cohort"},{label:"리턴",key:"returnEvent"}], "Cohort Week")}
             />
           )}
           {channelRetention && channelRetention.type === "line" && (
             <RetentionCurveChart
               data={channelRetention.data}
               title={channelRetention.title}
+              queryInfo={makeQueryInfo([{label:"코호트",key:"cohort"},{label:"리턴",key:"returnEvent"}], "Channel")}
             />
           )}
         </div>

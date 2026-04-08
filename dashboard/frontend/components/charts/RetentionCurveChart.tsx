@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
+import ChartHeader from "./ChartHeader";
+import type { ChartQueryInfo } from "@/lib/types";
 import {
   ResponsiveContainer,
   LineChart,
@@ -17,6 +19,7 @@ type Props = {
   data: { x: string; [series: string]: number | string }[];
   title: string;
   eventLabel?: string;
+  queryInfo?: ChartQueryInfo;
 };
 
 const PALETTE = ["#7c3aed", "#6366f1", "#a78bfa"];
@@ -25,6 +28,7 @@ export default function RetentionCurveChart({
   data,
   title,
   eventLabel,
+  queryInfo,
 }: Props) {
   const seriesKeys = useMemo(() => {
     if (data.length === 0) return [];
@@ -33,11 +37,7 @@ export default function RetentionCurveChart({
 
   return (
     <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
-      <p className="text-sm font-semibold text-slate-100">{title}</p>
-      {eventLabel && (
-        <p className="text-xs text-purple-400 mb-3">{eventLabel}</p>
-      )}
-      {!eventLabel && <div className="mb-3" />}
+      <ChartHeader title={title} eventLabel={eventLabel} queryInfo={queryInfo} />
 
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={data}>

@@ -12,7 +12,7 @@ import TimeSeriesChart from "@/components/charts/TimeSeriesChart";
 import HeatmapChart from "@/components/charts/HeatmapChart";
 import ComparisonBarChart from "@/components/charts/ComparisonBarChart";
 import { API_URL } from "@/lib/api";
-import type { EventSlot, AnalysisResponse } from "@/lib/types";
+import type { EventSlot, AnalysisResponse, ChartQueryInfo } from "@/lib/types";
 
 const EVENT_SLOTS: EventSlot[] = [
   {
@@ -66,6 +66,14 @@ export function CalendarTab() {
   const heatmapChart = data?.charts.find((c) => c.id === "heatmap");
   const monthPhaseChart = data?.charts.find((c) => c.id === "monthPhase");
 
+  const makeQueryInfo = (chartEvents: { label: string; key: string }[], breakdown?: string): ChartQueryInfo => ({
+    events: chartEvents
+      .filter(e => eventSelections[e.key])
+      .map(e => ({ label: e.label, value: eventSelections[e.key] })),
+    period: "30일",
+    breakdown,
+  });
+
   return (
     <div className="space-y-5">
       <EventSelector
@@ -82,6 +90,7 @@ export function CalendarTab() {
               data={hourlyChart.data as { label: string; value: number }[]}
               chartType="bar"
               title={hourlyChart.title}
+              queryInfo={makeQueryInfo([{ label: "이벤트", key: "primary" }], "Hour of Day")}
             />
           )}
           {heatmapChart && heatmapChart.type === "heatmap" && (
@@ -90,12 +99,14 @@ export function CalendarTab() {
               title={heatmapChart.title}
               xLabels={["0-3", "3-6", "6-9", "9-12", "12-15", "15-18", "18-21", "21-24"]}
               yLabels={["월", "화", "수", "목", "금", "토", "일"]}
+              queryInfo={makeQueryInfo([{ label: "이벤트", key: "primary" }], "Day of Week × Hour")}
             />
           )}
           {monthPhaseChart && monthPhaseChart.type === "bar" && (
             <ComparisonBarChart
               data={monthPhaseChart.data}
               title={monthPhaseChart.title}
+              queryInfo={makeQueryInfo([{ label: "이벤트", key: "primary" }], "Month Phase")}
             />
           )}
         </div>

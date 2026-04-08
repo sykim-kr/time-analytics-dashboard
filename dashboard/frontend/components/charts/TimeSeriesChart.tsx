@@ -1,5 +1,7 @@
 "use client";
 
+import ChartHeader from "./ChartHeader";
+import type { ChartQueryInfo } from "@/lib/types";
 import {
   ResponsiveContainer,
   BarChart,
@@ -19,6 +21,7 @@ type Props = {
   chartType: "bar" | "line";
   title: string;
   eventLabel?: string;
+  queryInfo?: ChartQueryInfo;
 };
 
 export default function TimeSeriesChart({
@@ -26,6 +29,7 @@ export default function TimeSeriesChart({
   chartType,
   title,
   eventLabel,
+  queryInfo,
 }: Props) {
   // Normalize data: detect shape and pick dataKey for x-axis
   const isXKeyed = data.length > 0 && "x" in data[0];
@@ -44,11 +48,7 @@ export default function TimeSeriesChart({
 
   return (
     <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
-      <p className="text-sm font-semibold text-slate-100">{title}</p>
-      {eventLabel && (
-        <p className="text-xs text-purple-400 mb-3">{eventLabel}</p>
-      )}
-      {!eventLabel && <div className="mb-3" />}
+      <ChartHeader title={title} eventLabel={eventLabel} queryInfo={queryInfo} />
 
       <ResponsiveContainer width="100%" height={300}>
         {chartType === "bar" ? (

@@ -12,7 +12,7 @@ import DistributionChart from "@/components/charts/DistributionChart";
 import FunnelLagChart from "@/components/charts/FunnelLagChart";
 import ComparisonBarChart from "@/components/charts/ComparisonBarChart";
 import { API_URL } from "@/lib/api";
-import type { EventSlot, AnalysisResponse } from "@/lib/types";
+import type { EventSlot, AnalysisResponse, ChartQueryInfo } from "@/lib/types";
 
 const EVENT_SLOTS: EventSlot[] = [
   {
@@ -62,6 +62,14 @@ export function TimeToXTab() {
 
   const status = isLoading ? "loading" : error ? "error" : data?.status || "loading";
 
+  const makeQueryInfo = (chartEvents: { label: string; key: string }[], breakdown?: string): ChartQueryInfo => ({
+    events: chartEvents
+      .filter(e => eventSelections[e.key])
+      .map(e => ({ label: e.label, value: eventSelections[e.key] })),
+    period: "30일",
+    breakdown,
+  });
+
   const timeDistChart = data?.charts.find((c) => c.id === "timeDistribution");
   const funnelLagChart = data?.charts.find((c) => c.id === "funnelLag");
   const fastSlowChart = data?.charts.find((c) => c.id === "fastSlow");
@@ -81,18 +89,21 @@ export function TimeToXTab() {
             <DistributionChart
               data={timeDistChart.data}
               title={timeDistChart.title}
+              queryInfo={makeQueryInfo([{label:"시작",key:"start"},{label:"완료",key:"end"}], "Time Bucket")}
             />
           )}
           {funnelLagChart && funnelLagChart.type === "bar" && (
             <FunnelLagChart
               data={funnelLagChart.data}
               title={funnelLagChart.title}
+              queryInfo={makeQueryInfo([{label:"시작",key:"start"},{label:"중간",key:"middle"},{label:"완료",key:"end"}], "Funnel Step")}
             />
           )}
           {fastSlowChart && fastSlowChart.type === "bar" && (
             <ComparisonBarChart
               data={fastSlowChart.data}
               title={fastSlowChart.title}
+              queryInfo={makeQueryInfo([{label:"시작",key:"start"},{label:"완료",key:"end"}], "Fast/Slow Split")}
             />
           )}
         </div>

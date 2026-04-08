@@ -52,6 +52,13 @@ export type ApiErrorResponse = {
   details?: string;
 };
 
+// --- Chart Query Info ---
+export type ChartQueryInfo = {
+  events: { label: string; value: string }[];
+  period?: string;
+  breakdown?: string;
+};
+
 // --- Event Selector ---
 export type EventSlot = {
   key: string;
