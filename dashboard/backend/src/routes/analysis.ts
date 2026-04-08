@@ -20,7 +20,7 @@ const mockHandlers: Record<string, (projectId: number) => unknown> = {
 };
 
 router.get("/analysis/:type", requireAuth, (req, res) => {
-  const { type } = req.params;
+  const type = req.params.type as string;
   const handler = mockHandlers[type];
   if (!handler) {
     res.status(404).json({ error: `Unknown analysis type: ${type}`, code: "not_found" });
