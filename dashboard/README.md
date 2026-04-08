@@ -1,4 +1,4 @@
-# 시간 기반 분석 대시보드
+# Time Analytics Dashboard (Monorepo)
 
 Mixpanel 데이터를 기반으로 시간 기반 분석 프레임워크의 6개 분석 주제를 시각화하는 대시보드입니다.
 
@@ -11,58 +11,84 @@ Mixpanel 데이터를 기반으로 시간 기반 분석 프레임워크의 6개 
 5. **Lifecycle** — 신규→활성→반복→휴면→이탈→복귀 상태 관리
 6. **External Context** — 캠페인, 급여일, 공휴일 맥락 분석
 
+## 프로젝트 구조
+
+```
+dashboard/
+├─ frontend/          ← Next.js (Vercel)
+│  ├─ app/            ← Pages and layout
+│  ├─ components/     ← React components (auth, dashboard, charts, tabs)
+│  ├─ contexts/       ← React Context (auth state)
+│  ├─ lib/            ← Types and API helper
+│  └─ package.json
+├─ backend/           ← Express (Railway)
+│  ├─ src/
+│  │  ├─ routes/      ← API routes (auth, projects, schema, analysis)
+│  │  ├─ middleware/   ← Auth middleware
+│  │  └─ lib/         ← Validation and mock data
+│  ├─ Dockerfile
+│  └─ package.json
+└─ README.md
+```
+
 ## 시작하기
 
-### 설치
+### 1. Backend 설치 및 실행
 
 ```bash
+cd backend
 npm install
-```
-
-### 환경 설정
-
-```bash
-cp .env.example .env.local
-```
-
-`.env.local` 파일을 편집하세요:
-
-```
-MIXPANEL_CLIENT_ID=your_client_id
-MIXPANEL_CLIENT_SECRET=your_client_secret
-MIXPANEL_REDIRECT_URI=http://localhost:3000/api/mixpanel/callback
-COOKIE_SECRET=your_random_secret_32chars
-USE_MOCK=true
-```
-
-Mock 모드(`USE_MOCK=true`)에서는 Mixpanel 자격 증명 없이도 대시보드를 체험할 수 있습니다.
-
-### 실행
-
-```bash
+cp .env.example .env
 npm run dev
 ```
 
-http://localhost:3000 에서 대시보드를 확인하세요.
+Backend runs on http://localhost:4000. Mock mode (`USE_MOCK=true`) is enabled by default.
+
+### 2. Frontend 설치 및 실행
+
+```bash
+cd frontend
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
+Frontend runs on http://localhost:3000.
+
+### 환경 변수
+
+**Backend** (`backend/.env`):
+```
+PORT=4000
+FRONTEND_URL=http://localhost:3000
+USE_MOCK=true
+```
+
+**Frontend** (`frontend/.env.local`):
+```
+NEXT_PUBLIC_API_URL=http://localhost:4000/api
+```
 
 ## 사용 방법
 
-1. "Mixpanel 인증하기" 버튼 클릭
-2. 프로젝트 선택
-3. 6개 탭을 전환하며 분석 확인
-4. 각 탭의 "분석 이벤트 설정"에서 이벤트 변경 가능
+1. Backend와 Frontend를 각각 실행
+2. http://localhost:3000 에서 "Mixpanel 인증하기" 버튼 클릭
+3. 프로젝트 선택
+4. 6개 탭을 전환하며 분석 확인
+
+## 배포
+
+### Frontend (Vercel)
+- Root directory: `frontend`
+- Build command: `npm run build`
+- Environment variable: `NEXT_PUBLIC_API_URL=https://your-backend.railway.app/api`
+
+### Backend (Railway)
+- Root directory: `backend`
+- Dockerfile path: `backend/Dockerfile`
+- Environment variables: `FRONTEND_URL`, `USE_MOCK`, `PORT`
 
 ## 기술 스택
 
-- Next.js (App Router) + TypeScript
-- Tailwind CSS
-- Recharts
-- TanStack Query
-- zod
-
-## 프로젝트 구조
-
-- `app/` — Next.js 페이지와 API 라우트
-- `components/` — React 컴포넌트 (auth, dashboard, charts, tabs)
-- `lib/` — 유틸리티, 타입, 목 데이터
-- `contexts/` — React Context (인증 상태)
+**Frontend**: Next.js (App Router), TypeScript, Tailwind CSS, Recharts, TanStack Query
+**Backend**: Express, TypeScript, cookie-parser, cors, zod

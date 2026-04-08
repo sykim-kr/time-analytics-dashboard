@@ -11,7 +11,19 @@
       "Bash(npm init:*)",
       "Bash(npm install:*)",
       "Bash(timeout 30 npm run dev)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(cp app/layout.tsx app/page.tsx app/globals.css frontend/app/)",
+      "Bash(cp -r components/* frontend/components/)",
+      "Bash(cp -r contexts/* frontend/contexts/)",
+      "Bash(cp package.json frontend/)",
+      "Bash(cp tsconfig.json frontend/)",
+      "Bash(cp lib/mock/*.ts backend/src/lib/mock/)",
+      "Bash(cp lib/mixpanel/validation.ts backend/src/lib/validation.ts)",
+      "Bash(cp lib/types.ts backend/src/types.ts)",
+      "Bash(rm -rf app/ components/ contexts/ lib/ node_modules/ .next/)",
+      "Bash(rm -f package.json package-lock.json tsconfig.json next.config.ts postcss.config.js next-env.d.ts)",
+      "Bash(npx tsc:*)"
     ]
   }
 }
