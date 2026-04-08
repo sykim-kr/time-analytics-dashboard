@@ -161,18 +161,80 @@ type ApiErrorResponse = {
 // 200 + status: "error"는 데이터 레벨 이슈 (이벤트 없음 등)
 ```
 
+### 이벤트 선택기 (Event Selector)
+
+각 탭은 분석에 사용할 이벤트를 사용자가 직접 선택/변경할 수 있는 "분석 이벤트 설정" 바를 탭 콘텐츠 상단에 표시한다.
+
+**동작 방식:**
+1. 프로젝트 선택 시 `/api/mixpanel/schema`로 이벤트 목록 조회
+2. 각 탭의 이벤트 슬롯에 후보군 자동 매핑 (예: signup → `Sign Up`, `Signup`, `User Signed Up` 중 존재하는 것)
+3. 사용자가 드롭다운으로 다른 이벤트 선택 가능
+4. "적용" 버튼 클릭 시 선택된 이벤트로 분석 데이터 재호출
+5. KPI 카드와 차트 제목에 현재 기준 이벤트명 표시 (어떤 이벤트 기준인지 명확)
+
+**탭별 이벤트 슬롯:**
+
+| 탭 | 슬롯 | 역할 | 기본값 |
+|---|---|---|---|
+| Calendar Time | 핵심 이벤트 | 시간대/요일 분석 대상 | App Open |
+| Calendar Time | 전환 이벤트 | 전환율 계산 대상 | Purchase |
+| Calendar Time | 탐색 이벤트 | 탐색 패턴 분석 | Page View |
+| Time-to-X | 퍼널 시작 | 퍼널 첫 단계 | Sign Up |
+| Time-to-X | 퍼널 중간 (선택) | 퍼널 중간 단계, 추가/삭제 가능 | Add to Cart |
+| Time-to-X | 퍼널 완료 | 퍼널 마지막 단계 | Purchase |
+| 코호트 & 리텐션 | 코호트 기준 | 코호트 분류 기준 | Sign Up |
+| 코호트 & 리텐션 | 리텐션 측정 | 재방문 측정 이벤트 | App Open |
+| Velocity / Lag | 빈도 측정 | 행동 빈도 대상 | Any Event |
+| Velocity / Lag | 세션 이벤트 | 세션 간격 분석 | Session Start |
+| Velocity / Lag | 전환 이벤트 | Fast/Slow 비교 대상 | Purchase |
+| Lifecycle | 가입 이벤트 | Lifecycle 시작점 | Sign Up |
+| Lifecycle | 활성 측정 | 활성/휴면 판단 기준 | App Open |
+| External Context | 분석 대상 | 맥락별 비교 대상 | Purchase |
+| External Context | 비교 기준 속성 | 맥락 구분 속성 | campaign |
+
+**Time-to-X 퍼널 특수 UI:** 시작 → 중간 → 완료 단계를 화살표로 시각적 연결. "+ 단계 추가" 버튼으로 중간 단계 추가 가능.
+
+**API 반영:** 분석 API에 `events` 파라미터 추가.
+```
+GET /api/mixpanel/analysis/calendar?projectId=123&events.primary=App+Open&events.conversion=Purchase&events.browse=Page+View
+GET /api/mixpanel/analysis/timetox?projectId=123&events.funnel=Sign+Up,Add+to+Cart,Purchase
+GET /api/mixpanel/analysis/retention?projectId=123&events.cohort=Sign+Up&events.return=App+Open
+```
+
+**컴포넌트:** `components/dashboard/EventSelector.tsx` — 탭별 슬롯 설정을 받아 드롭다운 렌더링. 선택 변경 시 부모 탭에 콜백.
+
+```ts
+type EventSlot = {
+  key: string;        // "primary", "conversion", "funnel" 등
+  label: string;      // "핵심 이벤트", "전환 이벤트" 등
+  defaultCandidates: string[];  // 자동 매핑 후보군
+  required: boolean;
+  value?: string;     // 현재 선택된 이벤트명
+}
+
+type EventSelectorProps = {
+  slots: EventSlot[];
+  availableEvents: string[];  // 스키마에서 가져온 전체 이벤트 목록
+  onChange: (selections: Record<string, string>) => void;
+  variant?: "default" | "funnel";  // Time-to-X는 funnel 레이아웃
+}
+```
+
+---
+
 ### 5.1 Calendar Time (📅 캘린더 시간)
 
 **목적:** 시간대/요일/월초월말/시간 블록 기준 행동 패턴 시각화
 
+**이벤트 슬롯:** 핵심 이벤트(App Open), 전환 이벤트(Purchase), 탐색 이벤트(Page View)
+
 | 구성 | 내용 |
 |------|------|
-| KPI 4개 | 피크 시간대, 주말 전환율, 월말 매출 비중, 골든 타임 CVR |
-| 차트 1 | 시간대별 이벤트 추이 (Bar) — 0~23시 |
-| 차트 2 | 요일 × 시간대 히트맵 (Heatmap) |
-| 차트 3 | 월초/월중/월말 비교 (Bar) |
+| KPI 4개 | 피크 시간대(핵심), 주말 전환율(전환/핵심), 월말 매출 비중(전환), 골든 타임 CVR(전환/핵심) |
+| 차트 1 | 시간대별 이벤트 추이 (Bar) — 0~23시, 기준: 핵심 이벤트 |
+| 차트 2 | 요일 × 시간대 히트맵 (Heatmap), 기준: 핵심 이벤트 |
+| 차트 3 | 월초/월중/월말 비교 (Bar), 기준: 전환 이벤트 |
 | 인사이트 | 골든 타임 발견, 주중/주말 패턴 차이, 월말 효과 |
-| 필요 이벤트 | App Open, Page View, Purchase 등 |
 
 **서버 후처리:** 시간 bucket, month_phase(early/mid/late), time_block(commute/work_morning/lunch/...) 계산
 
@@ -180,57 +242,61 @@ type ApiErrorResponse = {
 
 **목적:** 특정 행동까지 걸리는 시간 시각화 — UX 품질 + 전환 효율 지표
 
+**이벤트 슬롯 (funnel 레이아웃):** 퍼널 시작(Sign Up) → 퍼널 중간(Add to Cart, 선택) → 퍼널 완료(Purchase). 중간 단계 추가/삭제 가능.
+
 | 구성 | 내용 |
 |------|------|
-| KPI 4개 | 평균 전환 시간, 중앙값, Fast 유저 비율, 이탈 구간 |
-| 차트 1 | 가입→첫 행동 시간 분포 (Histogram) |
+| KPI 4개 | 평균 전환 시간(시작→완료), 중앙값, Fast 유저 비율, 이탈 구간 |
+| 차트 1 | 시작→첫 행동 시간 분포 (Histogram) |
 | 차트 2 | 퍼널 단계별 소요 시간 (Funnel Lag Bar) |
 | 차트 3 | Fast vs Slow 유저 비교 (Bar) |
 | 인사이트 | 전환 지연 구간, 이탈 위험 시점, CRM 개입 타이밍 |
-| 필요 이벤트 | Sign Up, Purchase, Add to Cart |
 
 ### 5.3 코호트 & 리텐션 (📊)
 
 **목적:** cohort별 유지율과 행동 차이 비교
 
+**이벤트 슬롯:** 코호트 기준(Sign Up), 리텐션 측정(App Open)
+
 | 구성 | 내용 |
 |------|------|
 | KPI 4개 | D1 리텐션, D7 리텐션, D30 리텐션, Plateau 시점 |
-| 차트 1 | 리텐션 커브 (Line — D0~D30) |
+| 차트 1 | 리텐션 커브 (Line — D0~D30), 기준: 코호트→리텐션 이벤트 |
 | 차트 2 | 코호트 테이블 (Table/Heatmap) |
 | 차트 3 | 채널별 리텐션 비교 (Multi-line) |
 | 인사이트 | 이탈 급락 시점, 습관 형성 여부, 채널 품질 |
-| 필요 이벤트 | Sign Up, App Open/Key Action |
 
 ### 5.4 Velocity / Lag (🚀)
 
 **목적:** 행동 빈도, 세션 간격, 퍼널 단계 간 지연 분석
 
+**이벤트 슬롯:** 빈도 측정(Any Event), 세션 이벤트(Session Start), 전환 이벤트(Purchase)
+
 | 구성 | 내용 |
 |------|------|
-| KPI 4개 | 인당 이벤트 수, 평균 세션 간격, 퍼널 Lag, High Intent 비율 |
-| 차트 1 | 유저별 이벤트 빈도 분포 (Bar) |
-| 차트 2 | 세션 간격 추이 (Line) |
-| 차트 3 | Fast vs Slow 구매 유저 비교 (Bar) |
+| KPI 4개 | 인당 이벤트 수(빈도), 평균 세션 간격(세션), 퍼널 Lag, High Intent 비율(전환) |
+| 차트 1 | 유저별 이벤트 빈도 분포 (Bar), 기준: 빈도 측정 이벤트 |
+| 차트 2 | 세션 간격 추이 (Line), 기준: 세션 이벤트 |
+| 차트 3 | Fast vs Slow 구매 유저 비교 (Bar), 기준: 전환 이벤트 |
 | 인사이트 | High intent 유저 특성, Churn 초기 신호, 행동 밀도 |
-| 필요 이벤트 | Any Event, Session Start, Purchase |
 
 ### 5.5 Lifecycle (🔄)
 
 **목적:** 신규→활성→반복→휴면→이탈→복귀 상태 전환 관리
 
+**이벤트 슬롯:** 가입 이벤트(Sign Up), 활성 측정 이벤트(App Open)
+
 | 구성 | 내용 |
 |------|------|
 | KPI 4개 | 활성 유저 비율, 휴면 유저 비율, Churn Rate, 복귀율 |
-| 차트 1 | Lifecycle 상태 분포 (Stacked Bar) |
+| 차트 1 | Lifecycle 상태 분포 (Stacked Bar), 기준: 활성 측정 이벤트 |
 | 차트 2 | Churn 위험 추이 (Line) |
 | 차트 3 | 복귀(Reactivation) 트렌드 (Line) |
 | 인사이트 | Churn 전 신호, 개입 타이밍, VIP 유저 정의 |
-| 필요 이벤트 | Sign Up, App Open, Key Actions |
 
-**Lifecycle 상태 정의 (서버에서 파생):**
-- 신규: 7일 내 가입
-- 활성: 7일 내 활동
+**Lifecycle 상태 정의 (서버에서 파생, 활성 측정 이벤트 기준):**
+- 신규: 7일 내 가입(가입 이벤트 기준)
+- 활성: 7일 내 활동(활성 측정 이벤트 기준)
 - 반복: 2회 이상 활동
 - 휴면: 7~30일 미활동
 - 이탈: 30일+ 미활동
@@ -240,14 +306,15 @@ type ApiErrorResponse = {
 
 **목적:** 캠페인, 급여일, 공휴일, 릴리즈 등 맥락과 행동 변화 연결
 
+**이벤트 슬롯:** 분석 대상 이벤트(Purchase), 비교 기준 속성(campaign)
+
 | 구성 | 내용 |
 |------|------|
 | KPI 4개 | 캠페인 Lift, 급여일 효과, 공휴일 트래픽 변화, Before/After 차이 |
-| 차트 1 | 캠페인 기간 전/중/후 비교 (Line + Area) |
-| 차트 2 | 급여일 전후 구매 패턴 (Bar) |
-| 차트 3 | 공휴일 vs 평일 비교 (Bar) |
+| 차트 1 | 캠페인 기간 전/중/후 비교 (Line + Area), 기준: 분석 대상 이벤트 |
+| 차트 2 | 급여일 전후 구매 패턴 (Bar), 기준: 분석 대상 이벤트 |
+| 차트 3 | 공휴일 vs 평일 비교 (Bar), 기준: 분석 대상 이벤트 |
 | 인사이트 | 진짜 원인 vs 착시 구분, 타이밍 기반 마케팅 기회 |
-| 필요 속성 | campaign, is_payday, is_holiday 플래그 |
 
 ---
 
@@ -297,6 +364,7 @@ dashboard/
 │  │  ├─ DashboardHeader.tsx
 │  │  ├─ AnalysisTabs.tsx
 │  │  ├─ TabContent.tsx
+│  │  ├─ EventSelector.tsx        # 탭별 이벤트 선택기
 │  │  ├─ KpiCards.tsx
 │  │  ├─ InsightList.tsx
 │  │  ├─ WarningBanner.tsx
@@ -355,6 +423,7 @@ page.tsx
 │  │  └─ ProjectSelector
 │  └─ AnalysisTabs
 │     └─ TabContent (공통 래퍼: loading/empty/error)
+│        ├─ EventSelector (탭별 이벤트 선택기)
 │        ├─ KpiCards
 │        ├─ [차트 컴포넌트들]
 │        └─ InsightList
