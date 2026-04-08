@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { EventSlot } from "@/lib/types";
 
 type EventSelectorProps = {
@@ -37,6 +37,17 @@ export function EventSelector({
   const [selections, setSelections] = useState<Record<string, string>>(() =>
     initSelections(slots, availableEvents)
   );
+  const prevEventsRef = useRef(availableEvents);
+
+  // Re-initialize selections when availableEvents change (project switch)
+  useEffect(() => {
+    if (prevEventsRef.current !== availableEvents && availableEvents.length > 0) {
+      prevEventsRef.current = availableEvents;
+      const newSelections = initSelections(slots, availableEvents);
+      setSelections(newSelections);
+      onChange(newSelections);
+    }
+  }, [availableEvents, slots, onChange]);
 
   const handleChange = (key: string, value: string) => {
     setSelections((prev) => ({ ...prev, [key]: value }));

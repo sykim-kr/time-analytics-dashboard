@@ -65,8 +65,19 @@ export class MixpanelClient {
       project_id: String(projectId),
       limit: "500",
     });
-    // Returns array of event name strings
     return Array.isArray(data) ? data : [];
+  }
+
+  async getTopEvents(projectId: number, limit = 100): Promise<{ event: string; amount: number }[]> {
+    const data = await this.request("/2.0/events/top", {
+      project_id: String(projectId),
+      type: "general",
+      limit: String(limit),
+    });
+    if (!data?.events || !Array.isArray(data.events)) return [];
+    return data.events
+      .filter((e: any) => !String(e.event).startsWith("$mp_"))
+      .map((e: any) => ({ event: String(e.event), amount: Number(e.amount) || 0 }));
   }
 
   // ── Segmentation API (event counts over time) ──
