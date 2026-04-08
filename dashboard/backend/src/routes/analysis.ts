@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireAuth, isMockMode } from "../middleware/auth";
 import { analysisQuerySchema } from "../lib/validation";
 import { getMockData as getCalendar } from "../lib/mock/calendar";
 import { getMockData as getTimetox } from "../lib/mock/timetox";
@@ -18,7 +19,7 @@ const mockHandlers: Record<string, (projectId: number) => unknown> = {
   context: getContext,
 };
 
-router.get("/analysis/:type", (req, res) => {
+router.get("/analysis/:type", requireAuth, (req, res) => {
   const { type } = req.params;
   const handler = mockHandlers[type];
   if (!handler) {
@@ -32,6 +33,9 @@ router.get("/analysis/:type", (req, res) => {
     return;
   }
 
+  // For now, always return mock data
+  // Real Mixpanel Query API integration requires saved report bookmark_ids
+  // which will be implemented when connecting to actual Mixpanel projects
   const data = handler(parsed.data.projectId);
   res.json(data);
 });
