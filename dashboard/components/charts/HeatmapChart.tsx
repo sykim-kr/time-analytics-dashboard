@@ -1,5 +1,7 @@
 "use client";
 
+import React from "react";
+
 type Props = {
   data: { x: string; y: string; value: number }[];
   title: string;
@@ -64,9 +66,8 @@ export default function HeatmapChart({
 
         {/* Rows */}
         {yLabels.map((yl) => (
-          <>
+          <React.Fragment key={yl}>
             <div
-              key={`label-${yl}`}
               className="text-xs text-slate-400 pr-2 flex items-center"
             >
               {yl}
@@ -82,7 +83,7 @@ export default function HeatmapChart({
                 />
               );
             })}
-          </>
+          </React.Fragment>
         ))}
       </div>
     </div>
