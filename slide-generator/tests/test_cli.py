@@ -66,3 +66,25 @@ def test_cli_verbose(tmp_path):
         cwd=str(CLI_PATH.parent.parent), env=_UTF8_ENV,
     )
     assert result.returncode == 0
+
+
+import pytest
+
+PROMPT_FILE = Path(__file__).parent.parent.parent / "claude_code_slide_generation_prompt.md"
+
+
+def test_e2e_full_document(tmp_path):
+    """End-to-end test with the actual 56-page prompt file."""
+    if not PROMPT_FILE.exists():
+        pytest.skip("Full prompt file not available")
+    output_file = tmp_path / "full_output.pptx"
+    result = subprocess.run(
+        [sys.executable, str(CLI_PATH), str(PROMPT_FILE), "-o", str(output_file)],
+        capture_output=True, text=True, encoding="utf-8",
+        cwd=str(CLI_PATH.parent.parent), env=_UTF8_ENV,
+    )
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    assert output_file.exists()
+    from pptx import Presentation as PptxPresentation
+    pptx = PptxPresentation(str(output_file))
+    assert len(pptx.slides) >= 30
