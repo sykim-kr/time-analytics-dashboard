@@ -7,6 +7,7 @@ import { EventSelector } from "@/components/dashboard/EventSelector";
 import TabContent from "@/components/dashboard/TabContent";
 import { KpiCards } from "@/components/dashboard/KpiCards";
 import { InsightList } from "@/components/dashboard/InsightList";
+import NLQueryPanel from "@/components/nlquery/NLQueryPanel";
 import TimeSeriesChart from "@/components/charts/TimeSeriesChart";
 import ComparisonBarChart from "@/components/charts/ComparisonBarChart";
 import { API_URL } from "@/lib/api";
@@ -90,6 +91,7 @@ export function ContextTab() {
           )}
         </div>
         <InsightList insights={data?.insights || []} />
+        <NLQueryPanel tab="context" />
       </TabContent>
     </div>
   );

@@ -11,6 +11,8 @@ type MixpanelAuthContextType = {
   selectedProject: MixpanelProject | null;
   error: string | null;
   availableEvents: string[];
+  nlSessionToken: string | null;
+  setNlSessionToken: (token: string) => void;
   connect: () => void;
   logout: () => Promise<void>;
   selectProject: (project: MixpanelProject) => Promise<void>;
@@ -33,6 +35,7 @@ export function MixpanelAuthProvider({ children }: { children: ReactNode }) {
   const [selectedProject, setSelectedProject] = useState<MixpanelProject | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [availableEvents, setAvailableEvents] = useState<string[]>([]);
+  const [nlSessionToken, setNlSessionToken] = useState<string | null>(null);
 
   const checkAuth = useCallback(async () => {
     try {
@@ -78,6 +81,7 @@ export function MixpanelAuthProvider({ children }: { children: ReactNode }) {
     setProjects([]);
     setSelectedProject(null);
     setAvailableEvents([]);
+    setNlSessionToken(null);
     setError(null);
     queryClient.clear();
   }, []);
@@ -109,6 +113,8 @@ export function MixpanelAuthProvider({ children }: { children: ReactNode }) {
           selectedProject,
           error,
           availableEvents,
+          nlSessionToken,
+          setNlSessionToken,
           connect,
           logout,
           selectProject,

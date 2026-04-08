@@ -7,6 +7,7 @@ import { EventSelector } from "@/components/dashboard/EventSelector";
 import TabContent from "@/components/dashboard/TabContent";
 import { KpiCards } from "@/components/dashboard/KpiCards";
 import { InsightList } from "@/components/dashboard/InsightList";
+import NLQueryPanel from "@/components/nlquery/NLQueryPanel";
 import DistributionChart from "@/components/charts/DistributionChart";
 import FunnelLagChart from "@/components/charts/FunnelLagChart";
 import ComparisonBarChart from "@/components/charts/ComparisonBarChart";
@@ -96,6 +97,7 @@ export function TimeToXTab() {
           )}
         </div>
         <InsightList insights={data?.insights || []} />
+        <NLQueryPanel tab="timetox" />
       </TabContent>
     </div>
   );

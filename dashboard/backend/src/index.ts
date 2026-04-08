@@ -5,6 +5,7 @@ import authRoutes from "./routes/auth";
 import projectsRoutes from "./routes/projects";
 import schemaRoutes from "./routes/schema";
 import analysisRoutes from "./routes/analysis";
+import nlAuthRoutes from "./routes/nl-auth";
 
 const app = express();
 const PORT = parseInt(process.env.PORT || "4000", 10);
@@ -22,6 +23,7 @@ app.use("/api", authRoutes);
 app.use("/api", projectsRoutes);
 app.use("/api", schemaRoutes);
 app.use("/api", analysisRoutes);
+app.use("/api", nlAuthRoutes);
 
 // Health check
 app.get("/health", (req, res) => {

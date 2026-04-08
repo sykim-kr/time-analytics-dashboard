@@ -7,6 +7,7 @@ import { EventSelector } from "@/components/dashboard/EventSelector";
 import TabContent from "@/components/dashboard/TabContent";
 import { KpiCards } from "@/components/dashboard/KpiCards";
 import { InsightList } from "@/components/dashboard/InsightList";
+import NLQueryPanel from "@/components/nlquery/NLQueryPanel";
 import RetentionCurveChart from "@/components/charts/RetentionCurveChart";
 import CohortTable from "@/components/charts/CohortTable";
 import { API_URL } from "@/lib/api";
@@ -89,6 +90,7 @@ export function RetentionTab() {
           )}
         </div>
         <InsightList insights={data?.insights || []} />
+        <NLQueryPanel tab="retention" />
       </TabContent>
     </div>
   );
