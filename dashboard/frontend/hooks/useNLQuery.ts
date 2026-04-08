@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { NL_QUERY_API_URL } from "@/lib/nlquery-config";
+import { useState, useCallback, useRef } from "react";
+import { API_URL } from "@/lib/api";
 import type { NLQueryResult, NLQueryStatus } from "@/lib/nlquery-config";
 
 type QueryState = "idle" | "authenticating" | "streaming" | "done" | "error";
@@ -11,24 +11,7 @@ export function useNLQuery() {
   const [status, setStatus] = useState<NLQueryStatus | null>(null);
   const [result, setResult] = useState<NLQueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const authenticate = useCallback(
-    async (username: string, secret: string): Promise<{ sessionToken: string; projects: any[] } | null> => {
-      try {
-        const res = await fetch(`${NL_QUERY_API_URL}/api/mixpanel/auth`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, secret }),
-        });
-        if (!res.ok) return null;
-        const data = await res.json();
-        return { sessionToken: data.sessionToken, projects: data.projects || [] };
-      } catch {
-        return null;
-      }
-    },
-    []
-  );
+  const doneRef = useRef(false);
 
   const query = useCallback(
     async (
@@ -40,14 +23,16 @@ export function useNLQuery() {
       setStatus(null);
       setResult(null);
       setError(null);
+      doneRef.current = false;
 
       try {
-        const res = await fetch(`${NL_QUERY_API_URL}/api/query/stream`, {
+        // Use our backend proxy to avoid CORS issues
+        const res = await fetch(`${API_URL}/nl-query`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
             question,
-            provider: "anthropic",
             projectId,
             sessionToken,
           }),
@@ -55,7 +40,7 @@ export function useNLQuery() {
 
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || `서버 오류 (${res.status})`);
+          throw new Error((errData as any).error || `서버 오류 (${res.status})`);
         }
 
         const reader = res.body?.getReader();
@@ -84,6 +69,7 @@ export function useNLQuery() {
                   setStatus(data as NLQueryStatus);
                 } else if (eventType === "result") {
                   setResult(data as NLQueryResult);
+                  doneRef.current = true;
                   setState("done");
                 } else if (eventType === "error") {
                   throw new Error(data.error || "분석 중 오류가 발생했습니다.");
@@ -96,8 +82,7 @@ export function useNLQuery() {
           }
         }
 
-        // If we finished reading but no result was set
-        if (state !== "done") {
+        if (!doneRef.current) {
           setState("done");
         }
       } catch (e: any) {
@@ -105,7 +90,7 @@ export function useNLQuery() {
         setState("error");
       }
     },
-    [state]
+    []
   );
 
   const reset = useCallback(() => {
@@ -113,7 +98,8 @@ export function useNLQuery() {
     setStatus(null);
     setResult(null);
     setError(null);
+    doneRef.current = false;
   }, []);
 
-  return { state, status, result, error, authenticate, query, reset };
+  return { state, status, result, error, query, reset };
 }

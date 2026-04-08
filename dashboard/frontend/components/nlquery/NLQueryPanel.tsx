@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useMixpanelAuth } from "@/contexts/MixpanelAuthContext";
 import { useNLQuery } from "@/hooks/useNLQuery";
+import { API_URL } from "@/lib/api";
 import ExampleQuestions from "./ExampleQuestions";
 import QueryInput from "./QueryInput";
 import QueryResult from "./QueryResult";
@@ -14,35 +15,34 @@ type Props = {
 
 export default function NLQueryPanel({ tab }: Props) {
   const { selectedProject, nlSessionToken, setNlSessionToken } = useMixpanelAuth();
-  const { state, status, result, error, authenticate, query, reset } = useNLQuery();
+  const { state, status, result, error, query, reset } = useNLQuery();
   const [input, setInput] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
+  const authenticatingRef = useRef(false);
 
-  // Auto-authenticate with NL query server when project is selected
   const ensureAuth = useCallback(async (): Promise<string | null> => {
     if (nlSessionToken) return nlSessionToken;
+    if (authenticatingRef.current) return null;
 
+    authenticatingRef.current = true;
     setAuthError(null);
-    // We need to get credentials from the cookie — but we can't access httpOnly cookies.
-    // Instead, we'll proxy through our backend or ask user to re-enter.
-    // For now, we'll try to use the existing cookie session via our backend proxy.
+
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "https://time-analytics-dashboard-production.up.railway.app/api"}/nl-auth`,
-        { credentials: "include" }
-      );
+      const res = await fetch(`${API_URL}/nl-auth`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         if (data.sessionToken) {
           setNlSessionToken(data.sessionToken);
+          authenticatingRef.current = false;
           return data.sessionToken;
         }
       }
     } catch {
-      // Backend proxy not available, try direct auth (will need credentials)
+      // proxy failed
     }
 
-    setAuthError("NL Query 서버 인증이 필요합니다. 로그아웃 후 다시 로그인해 주세요.");
+    authenticatingRef.current = false;
+    setAuthError("AI 분석 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.");
     return null;
   }, [nlSessionToken, setNlSessionToken]);
 
@@ -75,7 +75,7 @@ export default function NLQueryPanel({ tab }: Props) {
         value={input}
         onChange={setInput}
         onSubmit={handleSubmit}
-        loading={state === "streaming" || state === "authenticating"}
+        loading={state === "streaming"}
       />
 
       {authError && (
