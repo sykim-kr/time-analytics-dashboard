@@ -7,7 +7,7 @@ const router = Router();
 router.get("/auth", (req, res) => {
   if (isMockMode()) {
     setToken(res, "mock_token_" + Date.now());
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/+$/, "");
     res.redirect(frontendUrl + "/?authenticated=true");
     return;
   }
@@ -16,7 +16,7 @@ router.get("/auth", (req, res) => {
 
 // GET /api/callback — OAuth callback
 router.get("/callback", (req, res) => {
-  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+  const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/+$/, "");
   res.redirect(frontendUrl);
 });
 
