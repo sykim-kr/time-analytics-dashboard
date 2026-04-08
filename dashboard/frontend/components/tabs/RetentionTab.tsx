@@ -17,13 +17,13 @@ const EVENT_SLOTS: EventSlot[] = [
   {
     key: "cohort",
     label: "코호트 기준",
-    defaultCandidates: ["Sign Up", "Signup"],
+    defaultCandidates: ["$any_event"],
     required: true,
   },
   {
     key: "returnEvent",
     label: "리텐션 측정",
-    defaultCandidates: ["App Open", "Session Start", "Page View"],
+    defaultCandidates: ["$any_event"],
     required: true,
   },
 ];

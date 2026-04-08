@@ -10,17 +10,21 @@ type EventSelectorProps = {
   variant?: "default" | "funnel";
 };
 
+const ANY_EVENT = "$any_event";
+const ANY_EVENT_LABEL = "Any Event (전체)";
+
 function initSelections(
   slots: EventSlot[],
   availableEvents: string[]
 ): Record<string, string> {
   const initial: Record<string, string> = {};
+  const allEvents = [ANY_EVENT, ...availableEvents];
   for (const slot of slots) {
     if (slot.value) {
       initial[slot.key] = slot.value;
     } else {
       const match = slot.defaultCandidates.find((c) =>
-        availableEvents.includes(c)
+        allEvents.includes(c)
       );
       initial[slot.key] = match || availableEvents[0] || "";
     }
@@ -94,11 +98,14 @@ export function EventSelector({
                   {availableEvents.length === 0 ? (
                     <option value="">이벤트 없음</option>
                   ) : (
-                    availableEvents.map((ev) => (
-                      <option key={ev} value={ev}>
-                        {ev}
-                      </option>
-                    ))
+                    <>
+                      <option value={ANY_EVENT}>{ANY_EVENT_LABEL}</option>
+                      {availableEvents.map((ev) => (
+                        <option key={ev} value={ev}>
+                          {ev}
+                        </option>
+                      ))}
+                    </>
                   )}
                 </select>
               </div>

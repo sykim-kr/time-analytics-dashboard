@@ -155,7 +155,7 @@ export class MixpanelClient {
       from_date: fromDate,
       to_date: toDate,
     };
-    if (event) params.event = JSON.stringify([event]);
+    if (event && event !== "$any_event") params.event = JSON.stringify([event]);
     if (limit) params.limit = String(limit);
 
     const url = `${MIXPANEL_DATA_API}/export?${new URLSearchParams(params)}`;
