@@ -2,6 +2,12 @@
 
 import { useState } from "react";
 import { useMixpanelAuth } from "@/contexts/MixpanelAuthContext";
+import { CalendarTab } from "@/components/tabs/CalendarTab";
+import { TimeToXTab } from "@/components/tabs/TimeToXTab";
+import { RetentionTab } from "@/components/tabs/RetentionTab";
+import { VelocityTab } from "@/components/tabs/VelocityTab";
+import { LifecycleTab } from "@/components/tabs/LifecycleTab";
+import { ContextTab } from "@/components/tabs/ContextTab";
 
 const TABS = [
   { id: "calendar", label: "Calendar Time", icon: "\uD83D\uDCC5" },
@@ -13,6 +19,15 @@ const TABS = [
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
+
+const TAB_COMPONENTS: Record<TabId, React.ComponentType> = {
+  calendar: CalendarTab,
+  timetox: TimeToXTab,
+  retention: RetentionTab,
+  velocity: VelocityTab,
+  lifecycle: LifecycleTab,
+  context: ContextTab,
+};
 
 export default function AnalysisTabs() {
   const [activeTab, setActiveTab] = useState<TabId>("calendar");
@@ -32,6 +47,8 @@ export default function AnalysisTabs() {
       </div>
     );
   }
+
+  const ActiveTab = TAB_COMPONENTS[activeTab];
 
   return (
     <div className="flex flex-1 flex-col">
@@ -56,13 +73,9 @@ export default function AnalysisTabs() {
         })}
       </div>
 
-      {/* Tab content placeholder */}
-      <div className="flex-1 p-6">
-        <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-8 text-center">
-          <p className="text-sm text-slate-400">
-            Active tab: <span className="font-mono text-purple-400">{activeTab}</span>
-          </p>
-        </div>
+      {/* Tab content */}
+      <div className="flex-1 py-6">
+        {ActiveTab && <ActiveTab />}
       </div>
     </div>
   );
