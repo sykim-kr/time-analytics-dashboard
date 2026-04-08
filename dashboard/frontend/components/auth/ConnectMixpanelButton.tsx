@@ -9,7 +9,6 @@ export default function ConnectMixpanelButton() {
   const [showModal, setShowModal] = useState(false);
   const [username, setUsername] = useState("");
   const [secret, setSecret] = useState("");
-  const [projectId, setProjectId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -22,7 +21,7 @@ export default function ConnectMixpanelButton() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ username, secret, projectId: Number(projectId) }),
+        body: JSON.stringify({ username, secret }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -32,8 +31,7 @@ export default function ConnectMixpanelButton() {
       setShowModal(false);
       setUsername("");
       setSecret("");
-      setProjectId("");
-      connect(Number(projectId));
+      connect();
     } catch {
       setError("서버에 연결할 수 없습니다.");
     } finally {
@@ -107,19 +105,6 @@ export default function ConnectMixpanelButton() {
                   required
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-purple-500"
                   placeholder="secret"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">
-                  Project ID
-                </label>
-                <input
-                  type="number"
-                  value={projectId}
-                  onChange={(e) => setProjectId(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-purple-500"
-                  placeholder="12345"
                 />
               </div>
 

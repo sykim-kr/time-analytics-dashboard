@@ -8,14 +8,14 @@ const router = Router();
 router.post("/auth", async (req, res) => {
   const { username, secret, projectId } = req.body;
 
-  if (!username || !secret || !projectId) {
-    res.status(400).json({ error: "username, secret, projectId are required", code: "invalid_params" });
+  if (!username || !secret) {
+    res.status(400).json({ error: "username, secret are required", code: "invalid_params" });
     return;
   }
 
   if (isMockMode()) {
-    setCredentialsCookie(res, { username, secret, projectId: Number(projectId) });
-    res.json({ success: true, projectId: Number(projectId) });
+    setCredentialsCookie(res, { username, secret, projectId: Number(projectId || 1) });
+    res.json({ success: true, projectId: Number(projectId || 1) });
     return;
   }
 
@@ -28,8 +28,8 @@ router.post("/auth", async (req, res) => {
     return;
   }
 
-  setCredentialsCookie(res, { username, secret, projectId: Number(projectId) });
-  res.json({ success: true, projectId: Number(projectId) });
+  setCredentialsCookie(res, { username, secret, projectId: Number(projectId || 0) });
+  res.json({ success: true });
 });
 
 // Keep GET /api/auth for backwards compatibility (mock mode redirect)

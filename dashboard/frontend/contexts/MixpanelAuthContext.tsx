@@ -11,7 +11,7 @@ type MixpanelAuthContextType = {
   selectedProject: MixpanelProject | null;
   error: string | null;
   availableEvents: string[];
-  connect: (projectId?: number) => void;
+  connect: () => void;
   logout: () => Promise<void>;
   selectProject: (project: MixpanelProject) => Promise<void>;
 };
@@ -54,36 +54,21 @@ export function MixpanelAuthProvider({ children }: { children: ReactNode }) {
     checkAuth();
   }, [checkAuth]);
 
-  const connect = useCallback(async (projectId?: number) => {
-    if (projectId) {
-      setAuthState("loading_projects");
-      try {
-        const projRes = await fetch(`${API_URL}/projects`, { credentials: "include" });
-        if (projRes.ok) {
-          const projData = await projRes.json();
-          setProjects(projData.projects);
-
-          const project =
-            projData.projects.find((p: MixpanelProject) => p.id === projectId) ||
-            projData.projects[0];
-          if (project) {
-            setSelectedProject(project);
-            const schemaRes = await fetch(`${API_URL}/schema?projectId=${project.id}`, {
-              credentials: "include",
-            });
-            if (schemaRes.ok) {
-              const schema = await schemaRes.json();
-              setAvailableEvents(schema.events.map((e: { name: string }) => e.name));
-            }
-            setAuthState("project_selected");
-          } else {
-            setAuthState("authenticated");
-          }
-        }
-      } catch {
+  const connect = useCallback(async () => {
+    setAuthState("loading_projects");
+    try {
+      const projRes = await fetch(`${API_URL}/projects`, { credentials: "include" });
+      if (projRes.ok) {
+        const projData = await projRes.json();
+        setProjects(projData.projects);
+        setAuthState("authenticated");
+      } else {
         setError("프로젝트 로딩에 실패했습니다.");
         setAuthState("error");
       }
+    } catch {
+      setError("프로젝트 로딩에 실패했습니다.");
+      setAuthState("error");
     }
   }, []);
 

@@ -45,6 +45,16 @@ export class MixpanelClient {
     }
   }
 
+  async getProjects(): Promise<{ id: number; name: string }[]> {
+    const data = await this.request("/app/me");
+    const projects = data.results?.projects;
+    if (!projects) return [];
+    return Object.entries(projects).map(([id, proj]: [string, any]) => ({
+      id: Number(id),
+      name: proj.name,
+    })).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   async getEvents(projectId: number): Promise<any> {
     return this.request(`/app/projects/${projectId}/schema/events`);
   }
