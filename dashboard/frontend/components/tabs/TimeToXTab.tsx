@@ -81,6 +81,7 @@ export function TimeToXTab() {
         availableEvents={availableEvents}
         onChange={handleEventChange}
         variant="funnel"
+        loading={isLoading}
       />
       <TabContent status={status} requiredEvents={data?.requiredEvents} warnings={data?.warnings}>
         <KpiCards

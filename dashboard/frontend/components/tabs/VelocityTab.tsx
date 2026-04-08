@@ -80,6 +80,7 @@ export function VelocityTab() {
         availableEvents={availableEvents}
         onChange={handleEventChange}
         variant="default"
+        loading={isLoading}
       />
       <TabContent status={status} requiredEvents={data?.requiredEvents} warnings={data?.warnings}>
         <KpiCards
