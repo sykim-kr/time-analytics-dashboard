@@ -60,8 +60,13 @@ export class MixpanelClient {
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  async getEvents(projectId: number): Promise<any> {
-    return this.request(`/app/projects/${projectId}/schema/events`);
+  async getEvents(projectId: number): Promise<string[]> {
+    const data = await this.request("/2.0/events/names", {
+      project_id: String(projectId),
+      limit: "500",
+    });
+    // Returns array of event name strings
+    return Array.isArray(data) ? data : [];
   }
 
   // ── Segmentation API (event counts over time) ──

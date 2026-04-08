@@ -38,17 +38,12 @@ router.get("/schema", requireAuth, async (req, res) => {
   try {
     const credentials = (req as any).mixpanelCredentials;
     const client = createMixpanelClient(credentials.username, credentials.secret);
-    const rawEvents = await client.getEvents(Number(projectId));
+    const eventNames = await client.getEvents(Number(projectId));
 
-    // Transform Mixpanel schema response to our SchemaResponse format
-    const events = Array.isArray(rawEvents)
-      ? rawEvents.map((e: any) => ({
-          name: e.name || e.event || String(e),
-          properties: Array.isArray(e.properties)
-            ? e.properties.map((p: any) => ({ name: p.name || String(p), type: p.type || "string" }))
-            : [],
-        }))
-      : [];
+    // Transform event name strings to SchemaResponse format
+    const events = eventNames
+      .filter((name: string) => !name.startsWith("$mp_")) // Filter internal events
+      .map((name: string) => ({ name, properties: [] }));
 
     const schema: SchemaResponse = { events, userProperties: [] };
     res.json(schema);
