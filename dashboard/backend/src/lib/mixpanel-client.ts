@@ -8,7 +8,7 @@ export class MixpanelClient {
   }
 
   async request(path: string, params?: Record<string, string>): Promise<any> {
-    const url = new URL(path, MIXPANEL_BASE_URL);
+    const url = new URL(`${MIXPANEL_BASE_URL}${path}`);
     if (params) {
       Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
     }
