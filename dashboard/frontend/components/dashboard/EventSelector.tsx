@@ -37,16 +37,18 @@ export function EventSelector({
   const [selections, setSelections] = useState<Record<string, string>>(() =>
     initSelections(slots, availableEvents)
   );
-  const prevEventsRef = useRef(availableEvents);
+  const prevEventsRef = useRef<string[] | null>(null);
 
-  // Re-initialize selections when availableEvents change (project switch)
+  // Auto-apply on mount and re-initialize when availableEvents change
   useEffect(() => {
-    if (prevEventsRef.current !== availableEvents && availableEvents.length > 0) {
-      prevEventsRef.current = availableEvents;
-      const newSelections = initSelections(slots, availableEvents);
-      setSelections(newSelections);
-      onChange(newSelections);
-    }
+    if (availableEvents.length === 0) return;
+    // Skip if same events array (no change)
+    if (prevEventsRef.current === availableEvents) return;
+    prevEventsRef.current = availableEvents;
+
+    const newSelections = initSelections(slots, availableEvents);
+    setSelections(newSelections);
+    onChange(newSelections);
   }, [availableEvents, slots, onChange]);
 
   const handleChange = (key: string, value: string) => {

@@ -76,7 +76,13 @@ export function LifecycleTab() {
         variant="default"
       />
       <TabContent status={status} requiredEvents={data?.requiredEvents} warnings={data?.warnings}>
-        <KpiCards metrics={data?.metrics || []} />
+        <KpiCards
+          metrics={data?.metrics || []}
+          queryInfo={makeQueryInfo(
+            [{ label: "가입", key: "signup" }, { label: "활성 측정", key: "active" }],
+            "Lifecycle State"
+          )}
+        />
         <div className="grid grid-cols-2 gap-4">
           {lifecycleDistChart && lifecycleDistChart.type === "bar" && (
             <ComparisonBarChart

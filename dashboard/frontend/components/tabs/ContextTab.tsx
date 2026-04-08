@@ -76,7 +76,13 @@ export function ContextTab() {
         variant="default"
       />
       <TabContent status={status} requiredEvents={data?.requiredEvents} warnings={data?.warnings}>
-        <KpiCards metrics={data?.metrics || []} />
+        <KpiCards
+          metrics={data?.metrics || []}
+          queryInfo={makeQueryInfo(
+            [{ label: "분석 대상", key: "target" }, { label: "비교 기준", key: "comparison" }],
+            "Before/After Comparison"
+          )}
+        />
         <div className="grid grid-cols-2 gap-4">
           {campaignEffectChart && (
             <TimeSeriesChart

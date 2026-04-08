@@ -82,7 +82,13 @@ export function VelocityTab() {
         variant="default"
       />
       <TabContent status={status} requiredEvents={data?.requiredEvents} warnings={data?.warnings}>
-        <KpiCards metrics={data?.metrics || []} />
+        <KpiCards
+          metrics={data?.metrics || []}
+          queryInfo={makeQueryInfo(
+            [{ label: "빈도 측정", key: "frequency" }, { label: "전환", key: "conversion" }],
+            "Events per User"
+          )}
+        />
         <div className="grid grid-cols-2 gap-4">
           {frequencyChart && frequencyChart.type === "bar" && (
             <ComparisonBarChart

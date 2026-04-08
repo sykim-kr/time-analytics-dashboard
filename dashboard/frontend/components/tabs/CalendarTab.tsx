@@ -83,7 +83,13 @@ export function CalendarTab() {
         variant="default"
       />
       <TabContent status={status} requiredEvents={data?.requiredEvents} warnings={data?.warnings}>
-        <KpiCards metrics={data?.metrics || []} />
+        <KpiCards
+          metrics={data?.metrics || []}
+          queryInfo={makeQueryInfo(
+            [{ label: "핵심", key: "primary" }, { label: "전환", key: "conversion" }, { label: "탐색", key: "browse" }],
+            "Unique Users / Total"
+          )}
+        />
         <div className="grid grid-cols-2 gap-4">
           {hourlyChart && (
             <TimeSeriesChart

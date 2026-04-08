@@ -83,7 +83,13 @@ export function TimeToXTab() {
         variant="funnel"
       />
       <TabContent status={status} requiredEvents={data?.requiredEvents} warnings={data?.warnings}>
-        <KpiCards metrics={data?.metrics || []} />
+        <KpiCards
+          metrics={data?.metrics || []}
+          queryInfo={makeQueryInfo(
+            [{ label: "시작", key: "start" }, { label: "완료", key: "end" }],
+            "Time to Convert"
+          )}
+        />
         <div className="grid grid-cols-2 gap-4">
           {timeDistChart && timeDistChart.type === "bar" && (
             <DistributionChart

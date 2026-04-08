@@ -76,7 +76,13 @@ export function RetentionTab() {
         variant="default"
       />
       <TabContent status={status} requiredEvents={data?.requiredEvents} warnings={data?.warnings}>
-        <KpiCards metrics={data?.metrics || []} />
+        <KpiCards
+          metrics={data?.metrics || []}
+          queryInfo={makeQueryInfo(
+            [{ label: "코호트", key: "cohort" }, { label: "리턴", key: "returnEvent" }],
+            "Retention Rate"
+          )}
+        />
         <div className="grid grid-cols-2 gap-4">
           {retentionCurve && retentionCurve.type === "line" && (
             <RetentionCurveChart
