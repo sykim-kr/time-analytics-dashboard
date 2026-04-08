@@ -1,0 +1,48 @@
+meta:
+  name: "Memphis Corporate"
+  slide_width: 13.333
+  slide_height: 7.5
+
+colors:
+  primary: "#3B5998"
+  secondary: "#4A5568"
+  accent: "#FF6B6B"
+  accent_yellow: "#FFD93D"
+  accent_purple: "#6C5CE7"
+  background: "#F8F9FA"
+  section_bg: "#3B5998"
+  section_text: "#FFFFFF"
+  placeholder_bg: "#E8ECF1"
+
+fonts:
+  title:
+    name: "맑은 고딕"
+    fallback: ["Segoe UI", "Arial"]
+    size: 26
+    bold: true
+  subtitle:
+    name: "맑은 고딕"
+    fallback: ["Segoe UI", "Arial"]
+    size: 16
+    bold: false
+  body:
+    name: "맑은 고딕"
+    fallback: ["Segoe UI", "Arial"]
+    size: 12
+    bold: false
+  note:
+    name: "맑은 고딕"
+    fallback: ["Segoe UI", "Arial"]
+    size: 10
+    bold: false
+
+layout:
+  margin:
+    top: 0.7
+    bottom: 0.6
+    left: 1.0
+    right: 1.0
+  title_top: 0.5
+  body_top: 1.5
+  bullet_indent: 0.25
+  line_spacing: 1.15

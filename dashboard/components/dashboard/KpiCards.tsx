@@ -24,7 +24,7 @@ function ChangeIndicator({ change }: { change: string }) {
   return <span className="text-sm text-slate-400">{change}</span>;
 }
 
-export default function KpiCards({ metrics, eventLabels }: KpiCardsProps) {
+export function KpiCards({ metrics, eventLabels }: KpiCardsProps) {
   const displayMetrics = metrics.slice(0, 4);
 
   return (

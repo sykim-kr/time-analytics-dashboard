@@ -10,7 +10,8 @@
       "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --no-src-dir --import-alias=\"@/*\" --use-npm --yes)",
       "Bash(npm init:*)",
       "Bash(npm install:*)",
-      "Bash(timeout 30 npm run dev)"
+      "Bash(timeout 30 npm run dev)",
+      "Bash(npm run:*)"
     ]
   }
 }

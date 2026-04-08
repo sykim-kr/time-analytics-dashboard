@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+import math
+import re
 from pathlib import Path
-from typing import Union
 
 from pptx import Presentation as PptxPresentation
 from pptx.dml.color import RGBColor
@@ -23,11 +24,15 @@ _CONTENT_TYPES = {
     SlideType.APPENDIX,
 }
 
-MAX_BODY_ITEMS = 20
+# Height estimation constants (inches)
+BULLET_HEIGHT = 0.32
+TABLE_ROW_HEIGHT = 0.28
+TABLE_PADDING = 0.15
+SLIDE_BOTTOM_MARGIN = 0.6
 
 
 class PptxRenderer:
-    """Renders a Presentation model to a .pptx file using python-pptx."""
+    """Renders a Presentation model to a .pptx file with Memphis Corporate style."""
 
     def __init__(self, theme: Theme | None = None) -> None:
         self.theme = theme or load_theme()
@@ -45,7 +50,7 @@ class PptxRenderer:
         prev_section: str = ""
 
         for slide_model in presentation.slides:
-            # Auto-insert section divider when section changes (not for first slide)
+            # Auto-insert section divider when section changes
             if (
                 slide_model.section
                 and prev_section
@@ -53,12 +58,18 @@ class PptxRenderer:
             ):
                 self._add_section_divider(pptx, blank_layout, slide_model.section)
 
-            pptx_slide = pptx.slides.add_slide(blank_layout)
-            self._dispatch(pptx_slide, slide_model)
+            # Auto-split: split body into multiple slides if overflowing
+            sub_slides = self._split_slide_if_needed(slide_model)
 
-            if slide_model.speaker_note:
-                notes_slide = pptx_slide.notes_slide
-                notes_slide.notes_text_frame.text = slide_model.speaker_note
+            for idx, sub in enumerate(sub_slides):
+                pptx_slide = pptx.slides.add_slide(blank_layout)
+                self._apply_background(pptx_slide)
+                self._dispatch(pptx_slide, sub)
+
+                # Speaker notes only on the first sub-slide
+                if idx == 0 and slide_model.speaker_note:
+                    notes_slide = pptx_slide.notes_slide
+                    notes_slide.notes_text_frame.text = slide_model.speaker_note
 
             prev_section = slide_model.section
 
@@ -68,18 +79,64 @@ class PptxRenderer:
         return output_path
 
     # ------------------------------------------------------------------
+    # Auto-split logic
+    # ------------------------------------------------------------------
+
+    def _estimate_item_height(self, item) -> float:
+        """Estimate the rendered height of a single body item in inches."""
+        if isinstance(item, TableData):
+            return (len(item.rows) + 1) * TABLE_ROW_HEIGHT + TABLE_PADDING
+        text = str(item)
+        # Rough estimate: long lines wrap, so add extra height
+        line_count = max(1, math.ceil(len(text) / 70))
+        return BULLET_HEIGHT * line_count
+
+    def _max_body_height(self) -> float:
+        """Available height for body content on a single slide."""
+        return self._slide_h - self.theme.layout.body_top - SLIDE_BOTTOM_MARGIN
+
+    def _split_slide_if_needed(self, slide: Slide) -> list[Slide]:
+        """Split a slide into multiple if body overflows available space."""
+        if not slide.body:
+            return [slide]
+        if slide.type in (SlideType.TITLE, SlideType.IMAGE_REFERENCE, SlideType.SUMMARY):
+            return [slide]
+
+        max_h = self._max_body_height()
+        pages: list[list] = []
+        current_page: list = []
+        current_h = 0.0
+
+        for item in slide.body:
+            item_h = self._estimate_item_height(item)
+            if current_page and (current_h + item_h) > max_h:
+                pages.append(current_page)
+                current_page = []
+                current_h = 0.0
+            current_page.append(item)
+            current_h += item_h
+
+        if current_page:
+            pages.append(current_page)
+
+        if len(pages) <= 1:
+            return [slide]
+
+        # Create sub-slides
+        result: list[Slide] = []
+        for i, page_body in enumerate(pages):
+            suffix = f" ({i + 1}/{len(pages)})" if len(pages) > 1 else ""
+            result.append(slide.model_copy(update={
+                "title": slide.title + suffix,
+                "body": page_body,
+            }))
+        return result
+
+    # ------------------------------------------------------------------
     # Dispatcher
     # ------------------------------------------------------------------
 
     def _dispatch(self, pptx_slide, slide: Slide) -> None:
-        if len(slide.body) > MAX_BODY_ITEMS:
-            logger.warning(
-                "Slide %d has %d body items (> %d) — content may overflow",
-                slide.number,
-                len(slide.body),
-                MAX_BODY_ITEMS,
-            )
-
         if slide.type == SlideType.TITLE:
             self._render_title_slide(pptx_slide, slide)
         elif slide.type == SlideType.SUMMARY:
@@ -92,10 +149,7 @@ class PptxRenderer:
             self._render_two_column_slide(pptx_slide, slide)
         elif slide.type == SlideType.IMAGE_REFERENCE:
             self._render_image_placeholder(pptx_slide, slide)
-        elif slide.type in _CONTENT_TYPES:
-            self._render_content_slide(pptx_slide, slide)
         else:
-            # Fallback to content slide
             self._render_content_slide(pptx_slide, slide)
 
     # ------------------------------------------------------------------
@@ -130,15 +184,88 @@ class PptxRenderer:
         if color_rgb:
             run.font.color.rgb = RGBColor(*color_rgb)
 
-    def _add_title(self, slide, title: str, *, top: float | None = None, align=PP_ALIGN.LEFT):
+    def _apply_background(self, slide):
+        """Apply light background color to slide."""
+        bg = slide.background
+        fill = bg.fill
+        fill.solid()
+        r, g, b = self.theme.colors.hex_to_rgb("background")
+        fill.fore_color.rgb = RGBColor(r, g, b)
+
+    # ------------------------------------------------------------------
+    # Memphis decorative elements
+    # ------------------------------------------------------------------
+
+    def _add_accent_bar(self, slide, top: float, width: float = 0.8, color_name: str = "accent"):
+        """Add a small colored accent bar (Memphis style)."""
+        r, g, b = self.theme.colors.hex_to_rgb(color_name)
+        shape = slide.shapes.add_shape(
+            1,  # RECTANGLE
+            Inches(self._margin.left), Inches(top),
+            Inches(width), Inches(0.06),
+        )
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = RGBColor(r, g, b)
+        shape.line.fill.background()
+        return shape
+
+    def _add_side_decoration(self, slide, color_name: str = "accent_yellow"):
+        """Add a subtle side decoration strip (Memphis pattern element)."""
+        r, g, b = self.theme.colors.hex_to_rgb(color_name)
+        shape = slide.shapes.add_shape(
+            1,  # RECTANGLE
+            Inches(self._slide_w - 0.15), Inches(0),
+            Inches(0.15), Inches(self._slide_h),
+        )
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = RGBColor(r, g, b)
+        shape.line.fill.background()
+
+    def _add_corner_dot(self, slide, left: float, top: float, size: float = 0.18, color_name: str = "accent"):
+        """Add a small decorative circle (Memphis dot)."""
+        r, g, b = self.theme.colors.hex_to_rgb(color_name)
+        shape = slide.shapes.add_shape(
+            9,  # OVAL
+            Inches(left), Inches(top),
+            Inches(size), Inches(size),
+        )
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = RGBColor(r, g, b)
+        shape.line.fill.background()
+
+    def _add_page_number(self, slide, slide_model: Slide):
+        """Add page number at bottom right."""
         t = self.theme
-        top = top if top is not None else t.layout.title_top
         txbox = self._add_textbox(
             slide,
-            self._margin.left,
-            top,
-            self._usable_width,
-            0.6,
+            self._slide_w - self._margin.right - 0.8,
+            self._slide_h - 0.4,
+            0.8, 0.3,
+        )
+        tf = txbox.text_frame
+        p = tf.paragraphs[0]
+        p.alignment = PP_ALIGN.RIGHT
+        run = p.add_run()
+        run.text = str(slide_model.number)
+        run.font.name = t.fonts.note.name
+        run.font.size = Pt(t.fonts.note.size)
+        r, g, b = t.colors.hex_to_rgb("secondary")
+        run.font.color.rgb = RGBColor(r, g, b)
+
+    # ------------------------------------------------------------------
+    # Title rendering with accent bar
+    # ------------------------------------------------------------------
+
+    def _add_title(self, slide, title: str, *, top: float | None = None,
+                   align=PP_ALIGN.LEFT, slide_model: Slide | None = None):
+        t = self.theme
+        top = top if top is not None else t.layout.title_top
+
+        # Accent bar above title
+        self._add_accent_bar(slide, top - 0.12, width=0.6)
+
+        txbox = self._add_textbox(
+            slide, self._margin.left, top, self._usable_width, 0.7,
         )
         tf = txbox.text_frame
         tf.word_wrap = True
@@ -147,17 +274,28 @@ class PptxRenderer:
         run = p.add_run()
         run.text = title
         self._set_font(run, t.fonts.title, t.colors.hex_to_rgb("primary"))
+
+        # Section subtitle if available
+        if slide_model and slide_model.section:
+            sp = tf.add_paragraph()
+            sp.alignment = align
+            sr = sp.add_run()
+            sr.text = slide_model.section
+            sr.font.name = t.fonts.subtitle.name
+            sr.font.size = Pt(t.fonts.subtitle.size - 2)
+            r, g, b = t.colors.hex_to_rgb("secondary")
+            sr.font.color.rgb = RGBColor(r, g, b)
+
         return txbox
 
-    def _render_bullet(
-        self,
-        slide,
-        items: list[str | TableData],
-        *,
-        top: float | None = None,
-        left: float | None = None,
-        width: float | None = None,
-    ):
+    # ------------------------------------------------------------------
+    # Body rendering
+    # ------------------------------------------------------------------
+
+    def _render_bullet(self, slide, items: list, *,
+                       top: float | None = None,
+                       left: float | None = None,
+                       width: float | None = None):
         """Render body items (strings as bullets, TableData as tables)."""
         t = self.theme
         top = top if top is not None else t.layout.body_top
@@ -173,50 +311,96 @@ class PptxRenderer:
                     slide, str(item), current_top, left, width,
                 )
 
-    def _render_text_bullet(self, slide, text: str, top: float, left: float, width: float) -> float:
+    def _render_text_bullet(self, slide, text: str, top: float,
+                            left: float, width: float) -> float:
         t = self.theme
-        indent = t.layout.bullet_indent if text.startswith("  ") else 0
-        text = text.lstrip()
+        # Detect indent level
+        level = 0
+        clean = text
+        if text.startswith("  ") or clean.strip().startswith("○"):
+            level = 1
+        clean = re.sub(r"^[\s●○\-]+", "", text).strip()
+        if not clean:
+            return top + 0.1  # small gap for empty lines
 
-        txbox = self._add_textbox(slide, left + indent, top, width - indent, 0.4)
+        indent = level * t.layout.bullet_indent
+        actual_left = left + indent
+        actual_width = width - indent
+
+        # Bullet prefix styling
+        bullet_char = "  " if level > 0 else ""
+        if level == 0 and not text.strip().startswith(("🧪", "📌", "📊", "🚀", "💡", "🎯", "🖱", "☐")):
+            bullet_char = "  "
+
+        txbox = self._add_textbox(slide, actual_left, top, actual_width, 0.35)
         tf = txbox.text_frame
         tf.word_wrap = True
         p = tf.paragraphs[0]
+
+        # Check for emphasis (arrows, key phrases)
+        is_emphasis = "→" in clean or clean.startswith(("핵심", "정리"))
+
         run = p.add_run()
-        run.text = text
-        self._set_font(run, t.fonts.body, t.colors.hex_to_rgb("secondary"))
-        return top + 0.4
+        run.text = clean
+        run.font.name = t.fonts.body.name
+        run.font.size = Pt(t.fonts.body.size)
 
-    def _render_table(self, slide, table: TableData, top: float, left: float, width: float) -> float:
-        rows = len(table.rows) + 1  # +1 for header
+        if is_emphasis:
+            r, g, b = t.colors.hex_to_rgb("accent")
+            run.font.color.rgb = RGBColor(r, g, b)
+            run.font.bold = True
+        else:
+            r, g, b = t.colors.hex_to_rgb("secondary")
+            run.font.color.rgb = RGBColor(r, g, b)
+
+        return top + BULLET_HEIGHT
+
+    def _render_table(self, slide, table: TableData, top: float,
+                      left: float, width: float) -> float:
+        t = self.theme
+        rows = len(table.rows) + 1
         cols = len(table.headers)
-        col_width = width / cols if cols else width
+        if cols == 0:
+            return top
 
-        tbl = slide.shapes.add_table(
+        tbl_shape = slide.shapes.add_table(
             rows, cols,
             Inches(left), Inches(top),
-            Inches(width), Inches(0.3 * rows),
-        ).table
+            Inches(width), Inches(TABLE_ROW_HEIGHT * rows),
+        )
+        tbl = tbl_shape.table
 
-        # Header
+        # Style header row
+        header_rgb = t.colors.hex_to_rgb("primary")
         for ci, header in enumerate(table.headers):
             cell = tbl.cell(0, ci)
             cell.text = header
+            # Header background
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = RGBColor(*header_rgb)
             for p in cell.text_frame.paragraphs:
                 for run in p.runs:
                     run.font.bold = True
-                    run.font.size = Pt(self.theme.fonts.body.size)
+                    run.font.size = Pt(t.fonts.body.size - 1)
+                    run.font.name = t.fonts.body.name
+                    run.font.color.rgb = RGBColor(255, 255, 255)
 
-        # Data rows
+        # Data rows with alternating subtle background
         for ri, row in enumerate(table.rows, start=1):
             for ci, val in enumerate(row):
-                cell = tbl.cell(ri, ci)
-                cell.text = val
-                for p in cell.text_frame.paragraphs:
-                    for run in p.runs:
-                        run.font.size = Pt(self.theme.fonts.body.size)
+                if ci < cols:
+                    cell = tbl.cell(ri, ci)
+                    cell.text = val
+                    # Alternating row colors
+                    if ri % 2 == 0:
+                        cell.fill.solid()
+                        cell.fill.fore_color.rgb = RGBColor(0xF0, 0xF2, 0xF5)
+                    for p in cell.text_frame.paragraphs:
+                        for run in p.runs:
+                            run.font.size = Pt(t.fonts.body.size - 1)
+                            run.font.name = t.fonts.body.name
 
-        return top + 0.3 * rows + 0.2
+        return top + TABLE_ROW_HEIGHT * rows + TABLE_PADDING
 
     def _fill_background(self, slide, color_name: str):
         bg = slide.background
@@ -230,105 +414,175 @@ class PptxRenderer:
     # ------------------------------------------------------------------
 
     def _render_title_slide(self, slide, model: Slide) -> None:
-        """Center-aligned title + subtitle from body[0]."""
+        """Memphis-style title: accent bar, large title, decorative elements."""
         t = self.theme
-        center_top = self._slide_h / 2 - 0.8
+
+        # Side decoration strip
+        self._add_side_decoration(slide, "accent")
+
+        # Decorative dots
+        self._add_corner_dot(slide, 1.5, 1.2, 0.25, "accent_yellow")
+        self._add_corner_dot(slide, 10.5, 5.5, 0.2, "accent_purple")
+        self._add_corner_dot(slide, 2.0, 5.8, 0.15, "accent")
+
+        # Large accent bar
+        self._add_accent_bar(slide, 2.5, width=1.2, color_name="accent")
 
         # Title
         txbox = self._add_textbox(
-            slide,
-            self._margin.left,
-            center_top,
-            self._usable_width,
-            0.8,
+            slide, self._margin.left, 2.7, self._usable_width * 0.7, 1.2,
         )
         tf = txbox.text_frame
         tf.word_wrap = True
         p = tf.paragraphs[0]
-        p.alignment = PP_ALIGN.CENTER
+        p.alignment = PP_ALIGN.LEFT
         run = p.add_run()
         run.text = model.title
-        self._set_font(run, t.fonts.title, t.colors.hex_to_rgb("primary"))
+        run.font.name = t.fonts.title.name
+        run.font.size = Pt(34)
+        run.font.bold = True
+        r, g, b = t.colors.hex_to_rgb("primary")
+        run.font.color.rgb = RGBColor(r, g, b)
 
         # Subtitle from body[0]
         if model.body:
-            subtitle_text = str(model.body[0])
             sub_box = self._add_textbox(
-                slide,
-                self._margin.left,
-                center_top + 0.9,
-                self._usable_width,
-                0.5,
+                slide, self._margin.left, 4.1, self._usable_width * 0.6, 0.5,
             )
             sf = sub_box.text_frame
             sf.word_wrap = True
             sp = sf.paragraphs[0]
-            sp.alignment = PP_ALIGN.CENTER
+            sp.alignment = PP_ALIGN.LEFT
             srun = sp.add_run()
-            srun.text = subtitle_text
+            srun.text = str(model.body[0])
             self._set_font(srun, t.fonts.subtitle, t.colors.hex_to_rgb("secondary"))
 
+        # Bottom accent line
+        self._add_accent_bar(slide, self._slide_h - 0.5, width=self._usable_width, color_name="accent_yellow")
+
     def _render_content_slide(self, slide, model: Slide) -> None:
-        """Generic content: title + body bullets + tables."""
-        self._add_title(slide, model.title)
+        """Generic content: title + body bullets + tables with Memphis accents."""
+        # Side strip decoration (alternating colors based on slide number)
+        colors = ["accent", "accent_yellow", "accent_purple"]
+        self._add_side_decoration(slide, colors[model.number % 3])
+
+        self._add_title(slide, model.title, slide_model=model)
+        self._add_page_number(slide, model)
+
         if model.body:
             self._render_bullet(slide, model.body)
 
     def _render_summary_slide(self, slide, model: Slide) -> None:
-        """Accent background + white centered text."""
-        self._fill_background(slide, "accent")
+        """Corporate blue background + white text, Memphis dots."""
+        self._fill_background(slide, "primary")
         t = self.theme
-        center_top = self._slide_h / 2 - 0.5
 
+        # Decorative dots on dark background
+        self._add_corner_dot(slide, 0.8, 0.6, 0.2, "accent")
+        self._add_corner_dot(slide, 11.5, 6.2, 0.25, "accent_yellow")
+
+        # Accent bar
+        bar = slide.shapes.add_shape(
+            1, Inches(self._margin.left), Inches(2.2),
+            Inches(0.8), Inches(0.06),
+        )
+        bar.fill.solid()
+        bar.fill.fore_color.rgb = RGBColor(*t.colors.hex_to_rgb("accent"))
+        bar.line.fill.background()
+
+        # Title
         txbox = self._add_textbox(
-            slide, self._margin.left, center_top, self._usable_width, 1.0,
+            slide, self._margin.left, 2.5, self._usable_width, 1.0,
         )
         tf = txbox.text_frame
         tf.word_wrap = True
         p = tf.paragraphs[0]
-        p.alignment = PP_ALIGN.CENTER
+        p.alignment = PP_ALIGN.LEFT
         run = p.add_run()
         run.text = model.title
         run.font.name = t.fonts.title.name
-        run.font.size = Pt(t.fonts.title.size)
+        run.font.size = Pt(t.fonts.title.size + 2)
         run.font.bold = True
         run.font.color.rgb = RGBColor(255, 255, 255)
 
+        # Body items
         if model.body:
+            body_top = 3.8
             for item in model.body:
-                bp = tf.add_paragraph()
-                bp.alignment = PP_ALIGN.CENTER
+                text = str(item)
+                txb = self._add_textbox(
+                    slide, self._margin.left + 0.1, body_top, self._usable_width - 0.2, 0.35,
+                )
+                btf = txb.text_frame
+                btf.word_wrap = True
+                bp = btf.paragraphs[0]
                 br = bp.add_run()
-                br.text = str(item)
+                br.text = text
                 br.font.name = t.fonts.body.name
                 br.font.size = Pt(t.fonts.body.size)
-                br.font.color.rgb = RGBColor(255, 255, 255)
+                br.font.color.rgb = RGBColor(0xE2, 0xE8, 0xF0)
+                body_top += 0.38
 
     def _render_exercise_slide(self, slide, model: Slide) -> None:
-        """Title + checkbox-style items (checkbox prefix)."""
-        self._add_title(slide, model.title)
+        """Checklist style with purple accent."""
+        self._add_side_decoration(slide, "accent_purple")
+        self._add_title(slide, model.title, slide_model=model)
+        self._add_page_number(slide, model)
+
         t = self.theme
         top = t.layout.body_top
+        accent_rgb = t.colors.hex_to_rgb("accent_purple")
+
         for item in model.body:
             text = str(item)
-            if not text.startswith("\u2610"):
-                text = f"\u2610 {text}"
-            top = self._render_text_bullet(
-                slide, text, top, self._margin.left, self._usable_width,
+            clean = re.sub(r"^[\s●○\-🧪]+", "", text).strip()
+            if not clean:
+                continue
+
+            # Checkbox with purple accent
+            txbox = self._add_textbox(
+                slide, self._margin.left, top, self._usable_width, 0.35,
             )
+            tf = txbox.text_frame
+            tf.word_wrap = True
+            p = tf.paragraphs[0]
+
+            # Checkbox character
+            check_run = p.add_run()
+            check_run.text = "\u2610  "
+            check_run.font.name = t.fonts.body.name
+            check_run.font.size = Pt(t.fonts.body.size)
+            check_run.font.color.rgb = RGBColor(*accent_rgb)
+
+            # Text
+            text_run = p.add_run()
+            text_run.text = clean
+            text_run.font.name = t.fonts.body.name
+            text_run.font.size = Pt(t.fonts.body.size)
+            r, g, b = t.colors.hex_to_rgb("secondary")
+            text_run.font.color.rgb = RGBColor(r, g, b)
+
+            top += BULLET_HEIGHT
 
     def _render_example_slide(self, slide, model: Slide) -> None:
-        """2-column: question items left, insight items right."""
-        self._add_title(slide, model.title)
-        half = self._usable_width / 2 - 0.1
-        left_items: list[str | TableData] = []
-        right_items: list[str | TableData] = []
+        """2-column with question/insight split and accent divider."""
+        self._add_side_decoration(slide, "accent_yellow")
+        self._add_title(slide, model.title, slide_model=model)
+        self._add_page_number(slide, model)
 
+        half = self._usable_width / 2 - 0.2
+        left_items = []
+        right_items = []
         current = left_items
+
         for item in model.body:
             text = str(item) if not isinstance(item, TableData) else item
-            if isinstance(text, str) and ("insight" in text.lower() or "결과" in text.lower()):
-                current = right_items
+            if isinstance(text, str):
+                low = text.lower()
+                if any(kw in low for kw in ("인사이트", "insight", "결과", "액션")):
+                    current = right_items
+                elif any(kw in low for kw in ("질문", "question", "상황")):
+                    current = left_items
             current.append(text)
 
         if not right_items:
@@ -336,48 +590,119 @@ class PptxRenderer:
             left_items = list(model.body[:mid])
             right_items = list(model.body[mid:])
 
-        self._render_bullet(
-            slide, left_items,
-            left=self._margin.left, width=half,
+        # Column headers
+        t = self.theme
+        col_header_top = t.layout.body_top - 0.05
+
+        # Left column header
+        lh = self._add_textbox(slide, self._margin.left, col_header_top, half, 0.3)
+        lhp = lh.text_frame.paragraphs[0]
+        lhr = lhp.add_run()
+        lhr.text = "Question"
+        lhr.font.name = t.fonts.body.name
+        lhr.font.size = Pt(t.fonts.body.size - 1)
+        lhr.font.bold = True
+        lhr.font.color.rgb = RGBColor(*t.colors.hex_to_rgb("accent"))
+
+        # Right column header
+        rh = self._add_textbox(slide, self._margin.left + half + 0.4, col_header_top, half, 0.3)
+        rhp = rh.text_frame.paragraphs[0]
+        rhr = rhp.add_run()
+        rhr.text = "Insight"
+        rhr.font.name = t.fonts.body.name
+        rhr.font.size = Pt(t.fonts.body.size - 1)
+        rhr.font.bold = True
+        rhr.font.color.rgb = RGBColor(*t.colors.hex_to_rgb("accent_purple"))
+
+        # Vertical divider line
+        divider = slide.shapes.add_shape(
+            1,
+            Inches(self._margin.left + half + 0.15),
+            Inches(t.layout.body_top + 0.2),
+            Inches(0.03),
+            Inches(self._slide_h - t.layout.body_top - 1.0),
         )
-        self._render_bullet(
-            slide, right_items,
-            left=self._margin.left + half + 0.2, width=half,
-        )
+        divider.fill.solid()
+        divider.fill.fore_color.rgb = RGBColor(0xE2, 0xE8, 0xF0)
+        divider.line.fill.background()
+
+        body_top = t.layout.body_top + 0.3
+        self._render_bullet(slide, left_items, left=self._margin.left, width=half, top=body_top)
+        self._render_bullet(slide, right_items, left=self._margin.left + half + 0.4, width=half, top=body_top)
 
     def _render_two_column_slide(self, slide, model: Slide) -> None:
-        """2-column: CRM items left, experiment items right."""
-        self._add_title(slide, model.title)
-        half = self._usable_width / 2 - 0.1
+        """CRM/Experiment 2-column with accent divider."""
+        self._add_side_decoration(slide, "accent")
+        self._add_title(slide, model.title, slide_model=model)
+        self._add_page_number(slide, model)
 
-        mid = len(model.body) // 2 if model.body else 0
-        left_items = list(model.body[:mid]) if model.body else []
-        right_items = list(model.body[mid:]) if model.body else []
+        t = self.theme
+        half = self._usable_width / 2 - 0.2
 
-        self._render_bullet(
-            slide, left_items,
-            left=self._margin.left, width=half,
+        # Split body
+        left_items = []
+        right_items = []
+        current = left_items
+        for item in model.body:
+            text = str(item) if not isinstance(item, TableData) else ""
+            if "실험" in text or "Experiment" in text:
+                current = right_items
+            elif "CRM" in text or "🚀" in text:
+                current = left_items
+            current.append(item)
+
+        if not right_items:
+            mid = len(model.body) // 2
+            left_items = list(model.body[:mid])
+            right_items = list(model.body[mid:])
+
+        # Column headers
+        col_top = t.layout.body_top - 0.05
+        lh = self._add_textbox(slide, self._margin.left, col_top, half, 0.3)
+        lhr = lh.text_frame.paragraphs[0].add_run()
+        lhr.text = "CRM 실행"
+        lhr.font.name = t.fonts.body.name
+        lhr.font.size = Pt(t.fonts.body.size - 1)
+        lhr.font.bold = True
+        lhr.font.color.rgb = RGBColor(*t.colors.hex_to_rgb("accent"))
+
+        rh = self._add_textbox(slide, self._margin.left + half + 0.4, col_top, half, 0.3)
+        rhr = rh.text_frame.paragraphs[0].add_run()
+        rhr.text = "실험 설계"
+        rhr.font.name = t.fonts.body.name
+        rhr.font.size = Pt(t.fonts.body.size - 1)
+        rhr.font.bold = True
+        rhr.font.color.rgb = RGBColor(*t.colors.hex_to_rgb("accent_purple"))
+
+        # Divider
+        divider = slide.shapes.add_shape(
+            1,
+            Inches(self._margin.left + half + 0.15),
+            Inches(t.layout.body_top + 0.2),
+            Inches(0.03),
+            Inches(self._slide_h - t.layout.body_top - 1.0),
         )
-        self._render_bullet(
-            slide, right_items,
-            left=self._margin.left + half + 0.2, width=half,
-        )
+        divider.fill.solid()
+        divider.fill.fore_color.rgb = RGBColor(0xE2, 0xE8, 0xF0)
+        divider.line.fill.background()
+
+        body_top = t.layout.body_top + 0.3
+        self._render_bullet(slide, left_items, left=self._margin.left, width=half, top=body_top)
+        self._render_bullet(slide, right_items, left=self._margin.left + half + 0.4, width=half, top=body_top)
 
     def _render_image_placeholder(self, slide, model: Slide) -> None:
-        """Gray box with description text + caption."""
-        self._add_title(slide, model.title)
+        """Gray box placeholder with Memphis styling."""
+        self._add_side_decoration(slide, "accent_yellow")
+        self._add_title(slide, model.title, slide_model=model)
         t = self.theme
 
-        # 80% usable width, 60% slide height
         box_w = self._usable_width * 0.8
-        box_h = self._slide_h * 0.6
+        box_h = self._slide_h * 0.55
         box_left = self._margin.left + (self._usable_width - box_w) / 2
-        box_top = t.layout.body_top
+        box_top = t.layout.body_top + 0.2
 
-        # Gray placeholder rectangle
-        from pptx.util import Emu as _Emu
         shape = slide.shapes.add_shape(
-            1,  # MSO_SHAPE.RECTANGLE
+            1,
             Inches(box_left), Inches(box_top),
             Inches(box_w), Inches(box_h),
         )
@@ -387,7 +712,7 @@ class PptxRenderer:
         fill.fore_color.rgb = RGBColor(r, g, b)
         shape.line.fill.background()
 
-        # Description text inside box
+        # Description
         tf = shape.text_frame
         tf.word_wrap = True
         p = tf.paragraphs[0]
@@ -397,10 +722,9 @@ class PptxRenderer:
             run.text = str(model.body[0])
             self._set_font(run, t.fonts.body, t.colors.hex_to_rgb("secondary"))
 
-        # Caption below
-        cap_top = box_top + box_h + 0.15
+        # Caption
         cap_box = self._add_textbox(
-            slide, box_left, cap_top, box_w, 0.4,
+            slide, box_left, box_top + box_h + 0.1, box_w, 0.3,
         )
         cf = cap_box.text_frame
         cf.word_wrap = True
@@ -411,27 +735,45 @@ class PptxRenderer:
         self._set_font(cr, t.fonts.note, t.colors.hex_to_rgb("secondary"))
 
     def _add_section_divider(self, pptx, layout, section_title: str) -> None:
-        """Dark background + white centered section title."""
+        """Corporate blue background + white centered section title with Memphis."""
         slide = pptx.slides.add_slide(layout)
         self._fill_background(slide, "section_bg")
         t = self.theme
-        center_top = self._slide_h / 2 - 0.4
 
+        # Decorative elements
+        self._add_corner_dot(slide, 1.0, 1.0, 0.3, "accent")
+        self._add_corner_dot(slide, 10.0, 5.5, 0.25, "accent_yellow")
+
+        # Accent bar
+        bar = slide.shapes.add_shape(
+            1, Inches(self._margin.left), Inches(3.0),
+            Inches(1.0), Inches(0.06),
+        )
+        bar.fill.solid()
+        bar.fill.fore_color.rgb = RGBColor(*t.colors.hex_to_rgb("accent"))
+        bar.line.fill.background()
+
+        # Section title
         txbox = self._add_textbox(
-            slide,
-            self._margin.left,
-            center_top,
-            self._usable_width,
-            0.8,
+            slide, self._margin.left, 3.3, self._usable_width, 1.0,
         )
         tf = txbox.text_frame
         tf.word_wrap = True
         p = tf.paragraphs[0]
-        p.alignment = PP_ALIGN.CENTER
+        p.alignment = PP_ALIGN.LEFT
         run = p.add_run()
         run.text = section_title
-        r, g, b = t.colors.hex_to_rgb("section_text")
         run.font.name = t.fonts.title.name
-        run.font.size = Pt(t.fonts.title.size)
+        run.font.size = Pt(32)
         run.font.bold = True
+        r, g, b = t.colors.hex_to_rgb("section_text")
         run.font.color.rgb = RGBColor(r, g, b)
+
+        # Bottom yellow bar
+        bottom_bar = slide.shapes.add_shape(
+            1, Inches(0), Inches(self._slide_h - 0.12),
+            Inches(self._slide_w), Inches(0.12),
+        )
+        bottom_bar.fill.solid()
+        bottom_bar.fill.fore_color.rgb = RGBColor(*t.colors.hex_to_rgb("accent_yellow"))
+        bottom_bar.line.fill.background()

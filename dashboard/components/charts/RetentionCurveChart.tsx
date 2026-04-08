@@ -58,7 +58,7 @@ export default function RetentionCurveChart({
               borderRadius: 8,
               color: "#fff",
             }}
-            formatter={(v: number) => `${v}%`}
+            formatter={(v) => `${v}%`}
           />
           <Legend />
 

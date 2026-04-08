@@ -4,7 +4,7 @@ type InsightListProps = {
   insights: string[];
 };
 
-export default function InsightList({ insights }: InsightListProps) {
+export function InsightList({ insights }: InsightListProps) {
   if (insights.length === 0) return null;
 
   return (
