@@ -38,10 +38,11 @@ export function decryptCredentials(encrypted: string): { username: string; secre
 
 export function setCredentialsCookie(res: Response, data: { username: string; secret: string; projectId: number }): void {
   const encrypted = encryptCredentials(data);
+  const isProduction = process.env.NODE_ENV === "production" || !!process.env.RAILWAY_ENVIRONMENT;
   res.cookie(COOKIE_NAME, encrypted, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
     path: "/",
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
@@ -54,10 +55,11 @@ export function getCredentials(req: Request): { username: string; secret: string
 }
 
 export function clearCredentialsCookie(res: Response): void {
+  const isProduction = process.env.NODE_ENV === "production" || !!process.env.RAILWAY_ENVIRONMENT;
   res.clearCookie(COOKIE_NAME, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
     path: "/",
   });
 }
