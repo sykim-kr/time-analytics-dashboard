@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash \"C:/Users/ottug/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.5/skills/brainstorming/scripts/start-server.sh\" --project-dir \"C:/Users/ottug/Downloads/11_개발_테스트/time analytics framework/dashboard\")",
+      "Bash(xargs cat:*)",
+      "Bash(while read:*)",
+      "Bash(do echo:*)",
+      "Read(//c/Users/ottug/Downloads/11_개발_테스트/time analytics framework/dashboard/**)",
+      "Bash(done)",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --no-src-dir --import-alias=\"@/*\" --use-npm --yes)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(timeout 30 npm run dev)"
+    ]
+  }
+}
